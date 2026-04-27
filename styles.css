@@ -643,6 +643,25 @@ input[type="checkbox"] {
   font-weight: 800;
 }
 
+.plan-summary {
+  display: grid;
+  gap: 2px;
+  margin: 2px 0 8px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: rgba(255, 244, 237, 0.08);
+}
+
+.plan-summary strong {
+  color: #ffe0c1;
+  font-size: 13px;
+}
+
+.plan-summary span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .world-activities {
   margin: 10px 0 0;
   padding: 14px;
@@ -817,6 +836,13 @@ input[type="checkbox"] {
   color: var(--text);
   background: rgba(216, 154, 170, 0.28);
   border-color: rgba(255, 216, 174, 0.32);
+}
+
+.mode-profile {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .module-grid button,

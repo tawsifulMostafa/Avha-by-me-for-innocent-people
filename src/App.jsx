@@ -155,6 +155,7 @@ const supportActivities = {
   story: ["☘", "সোশ্যাল স্টোরি", "হ্যালো বলা ও সহজ সিদ্ধান্ত"],
   calm: ["☁", "শান্ত শ্বাস", "চাপ ছাড়া breathing activity"],
   bubble: ["🫧", "বুদবুদ খেলা", "বড় bubble tap করলে আলতোভাবে ফাটবে"],
+  caregiver: ["👨‍👩‍👧", "Parent Guided Play", "কেয়ারগিভারের সাথে ধাপে ধাপে activity করুন"],
 };
 
 function placeFirst(activities, activity) {
@@ -169,12 +170,14 @@ function buildDailyPlan(mode, answers, mood) {
   let focus = mode.focus;
   let hero = mode.hero;
   let planLabel = `${mode.label} · ${mode.age}`;
+  const profile = [];
 
   if (answers.speech !== "yes" || challenges.includes("Speech")) {
     activities = placeFirst(activities, supportActivities.aac);
     focus = "ছবিতে tap করে প্রয়োজন বলো";
     hero = "▣";
     reasons.push("Speech support আগে");
+    profile.push("Speech support");
   }
 
   if (challenges.includes("Social")) {
@@ -182,6 +185,7 @@ function buildDailyPlan(mode, answers, mood) {
     focus = "মুখ দেখে অনুভূতি চেনো";
     hero = "☺";
     reasons.push("Social practice আগে");
+    profile.push("Social focus");
   }
 
   if (challenges.includes("Sensory") || answers.level === "Level 3" || mood === "মন খারাপ") {
@@ -189,6 +193,7 @@ function buildDailyPlan(mode, answers, mood) {
     focus = "আগে একটু শান্ত হই";
     hero = "☁";
     reasons.push("Sensory calm আগে");
+    profile.push("Sensory safe");
   }
 
   if (answers.age === "1-3" || mode.label === "অনুভব") {
@@ -207,8 +212,27 @@ function buildDailyPlan(mode, answers, mood) {
     reasons.push("নতুন challenge ধীরে");
   }
 
+  if (answers.level === "Level 2") {
+    reasons.push("মাঝারি সহায়তা mode");
+    activities = [...activities.slice(0, 4), ...activities.slice(4)];
+    profile.push("Level 2");
+  }
+
+  if (answers.level === "Level 3") {
+    activities = placeFirst(placeFirst(activities, supportActivities.calm), supportActivities.bubble);
+    reasons.push("লো-প্রেশার plan");
+    profile.push("Level 3");
+  }
+
   if (answers.play === "caregiver") {
+    activities = placeFirst(activities, supportActivities.caregiver);
     reasons.push("Caregiver guided");
+    profile.push("Caregiver mode");
+  }
+
+  if (answers.therapy === "yes") {
+    reasons.push("থেরাপি history consider");
+    profile.push("Therapy history");
   }
 
   return {
@@ -218,6 +242,7 @@ function buildDailyPlan(mode, answers, mood) {
     hero,
     planLabel,
     reason: reasons.slice(0, 2).join(" · ") || "আজকের plan প্রস্তুত",
+    profileText: profile.slice(0, 3).join(" · "),
   };
 }
 
@@ -429,8 +454,8 @@ function App() {
         )}
         {screen === "ready" && <Ready childName={childName} onNext={() => go("mood")} />}
         {screen === "mood" && <MoodScreen chooseMood={chooseMood} />}
-        {screen === "home" && <Home childName={childName} mode={dailyPlan} moodCopy={moodCopy} stars={stars} language={language} world={world} touchWorld={touchWorld} restartSetup={restartSetup} go={go} openActivity={openActivity} />}
-        {screen === "mode" && <ModeMenu mode={dailyPlan} setAgeBand={setAgeBand} ageBand={ageBand} go={go} openActivity={openActivity} />}
+        {screen === "home" && <Home childName={childName} mode={dailyPlan} setupAnswers={setupAnswers} moodCopy={moodCopy} stars={stars} language={language} world={world} touchWorld={touchWorld} restartSetup={restartSetup} go={go} openActivity={openActivity} />}
+        {screen === "mode" && <ModeMenu mode={dailyPlan} setupAnswers={setupAnswers} setAgeBand={setAgeBand} ageBand={ageBand} go={go} openActivity={openActivity} />}
         {screen === "activity" && <Activity activity={selectedActivity} mode={mode} reward={reward} go={go} />}
         {screen === "emotion" && <Emotion reward={reward} softMiss={softMiss} hintVisible={hintVisible} attempts={attempts} go={go} />}
         {screen === "story" && <Story reward={reward} softMiss={softMiss} hintVisible={hintVisible} go={go} />}
@@ -501,7 +526,7 @@ function MoodScreen({ chooseMood }) {
   return <Screen><div className="screen-head centered mood-head"><h2>আজ তুমি কেমন অনুভব করছো?</h2><p>তোমার অনুভূতি জানলে আভা কোমলভাবে দিন সাজাবে।</p></div><div className="mood-column">{moods.map(([kind, face, label]) => <button className={`mood-face ${kind}`} type="button" key={label} onClick={() => chooseMood(label)}><span>{face}</span><strong>{label}</strong></button>)}</div></Screen>;
 }
 
-function Home({ childName, mode, moodCopy, stars, language, world, touchWorld, restartSetup, go, openActivity }) {
+function Home({ childName, mode, setupAnswers, moodCopy, stars, language, world, touchWorld, restartSetup, go, openActivity }) {
   const fireflies = Array.from({ length: Math.min(10, Math.floor(world.fireflies)) });
   const flowers = Array.from({ length: Math.min(7, Math.floor(world.flowers)) });
   return (
@@ -521,6 +546,10 @@ function Home({ childName, mode, moodCopy, stars, language, world, touchWorld, r
         </div>
       </button>
       <div className="world-prompt">{world.taps === 0 ? "আভাকে আলতো করে ছুঁয়ে দেখো" : world.mood === "happy" ? "আভা খুশি হয়েছে" : "জোনাকি জ্বলছে"}</div>
+      <div className="plan-summary">
+        <strong>{mode.reason}</strong>
+        <span>{mode.profileText || `Level: ${setupAnswers.level}`}</span>
+      </div>
       <div className="offline-strip"><span>●</span>{language === "bn" ? "Offline ready" : "Offline ready"}<button type="button" onClick={restartSetup}>Setup</button></div>
       <div className="path-panel world-activities"><div className="mode-kicker"><span>{mode.planLabel}</span><small>{mode.reason}</small></div><div className="path-line">{mode.activities.slice(0, 3).map((activity) => <button type="button" key={activity[1]} onClick={() => openActivity(activity)}>{activity[0]} {activity[1]}</button>)}</div></div>
       <div className="gentle-start"><button type="button" onClick={() => openActivity(mode.activities[0])}>{mode.hero} শুরু</button><button type="button" onClick={() => go("mode")}>সব খেলা</button></div>
@@ -529,11 +558,11 @@ function Home({ childName, mode, moodCopy, stars, language, world, touchWorld, r
   );
 }
 
-function ModeMenu({ mode, setAgeBand, ageBand, go, openActivity }) {
+function ModeMenu({ mode, setupAnswers, setAgeBand, ageBand, go, openActivity }) {
   return (
     <Screen>
       <button className="ghost-back" type="button" onClick={() => go("home")}>‹</button>
-      <div className="screen-head"><p className="eyebrow">{mode.label} · {mode.age}</p><h2>আজকের মেনু</h2><p>{mode.guide}</p></div>
+      <div className="screen-head"><p className="eyebrow">{mode.label} · {mode.age}</p><h2>আজকের মেনু</h2><p>{mode.guide}</p><small className="mode-profile">Profile: {setupAnswers.level}, speech: {setupAnswers.speech}, play: {setupAnswers.play}</small></div>
       <div className="mode-switch">{Object.entries(modes).map(([key, item]) => <button className={ageBand === key ? "active" : ""} type="button" key={key} onClick={() => setAgeBand(key)}>{item.label}</button>)}</div>
       <div className="module-grid">{mode.activities.map((activity) => <button type="button" key={activity[1]} onClick={() => openActivity(activity)}><span>{activity[0]}</span>{activity[1]}</button>)}</div>
       <button className="secondary-button bottom" type="button" onClick={() => go("home")}>হোমে ফিরুন</button>
