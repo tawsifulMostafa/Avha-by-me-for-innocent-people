@@ -15,7 +15,12 @@ const types = {
 createServer((request, response) => {
   const url = new URL(request.url || "/", `http://127.0.0.1:${port}`);
   const pathname = url.pathname === "/" ? "/index.html" : url.pathname;
-  const filePath = join(root, pathname);
+  const filePath = resolve(root, `.${decodeURIComponent(pathname)}`);
+  if (!filePath.startsWith(root)) {
+    response.writeHead(403);
+    response.end("Forbidden");
+    return;
+  }
   const finalPath = existsSync(filePath) ? filePath : join(root, "index.html");
 
   response.setHeader("Content-Type", types[extname(finalPath)] || "application/octet-stream");

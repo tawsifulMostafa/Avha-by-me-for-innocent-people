@@ -500,6 +500,16 @@ input[type="checkbox"] {
   font-weight: 700;
 }
 
+.offline-strip button {
+  margin-left: auto;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: var(--text);
+  background: rgba(216, 154, 170, 0.24);
+  font-weight: 800;
+}
+
 .offline-strip span {
   color: var(--green);
 }
@@ -1103,6 +1113,10 @@ input[type="checkbox"] {
   border-radius: 999px;
   color: var(--text);
   background: rgba(216, 154, 170, 0.24);
+}
+
+.setup-again {
+  margin-top: 12px;
 }
 
 .bars {

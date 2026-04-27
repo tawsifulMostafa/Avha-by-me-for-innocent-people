@@ -2,6 +2,39 @@ import React, { useEffect, useMemo, useState } from "react";
 
 const storageKey = "aava-progress-v1";
 
+const defaultProgress = {
+  completed: 0,
+  starsEarned: 0,
+  moodHistory: [],
+  modules: {},
+  weakAreas: {},
+};
+
+const activityFallbacks = {
+  emotion: "ইমোশন গেম",
+  story: "সোশ্যাল স্টোরি",
+  trace: "বাংলা ট্রেসিং",
+  aac: "AAC বোর্ড",
+  activity: "Activity",
+};
+
+const aacItems = [
+  ["💧", "আমি পানি চাই"],
+  ["🍚", "আমি খাবার চাই"],
+  ["🤗", "আলিঙ্গন চাই"],
+  ["🛑", "বিরতি চাই"],
+  ["☁", "আমি শান্ত হতে চাই"],
+  ["🎲", "আমি খেলতে চাই"],
+];
+
+const defaultSetupAnswers = {
+  age: "4-6",
+  level: "Level 1",
+  speech: "yes",
+  therapy: "yes",
+  play: "alone",
+};
+
 const setupSteps = [
   { id: "name", eyebrow: "প্রথম সেটআপ", title: "শিশুর নাম লিখুন", text: "নামের মাধ্যমে আভা প্রতিদিনের অভিজ্ঞতা সাজাবে।" },
   {
@@ -107,11 +140,20 @@ const modes = {
 function loadInitialState() {
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey));
-    if (saved) return saved;
+    if (!saved) return null;
+    return {
+      ...saved,
+      progress: {
+        ...defaultProgress,
+        ...(saved.progress || {}),
+        moodHistory: Array.isArray(saved.progress?.moodHistory) ? saved.progress.moodHistory : [],
+        modules: saved.progress?.modules || {},
+        weakAreas: saved.progress?.weakAreas || {},
+      },
+    };
   } catch {
     return null;
   }
-  return null;
 }
 
 function App() {
@@ -121,6 +163,11 @@ function App() {
   const [setupIndex, setSetupIndex] = useState(saved?.setupIndex || 0);
   const [childName, setChildName] = useState(saved?.childName || "সিমা");
   const [ageBand, setAgeBand] = useState(saved?.ageBand || "4-6");
+  const [setupAnswers, setSetupAnswers] = useState({
+    ...defaultSetupAnswers,
+    ...(saved?.setupAnswers || {}),
+    age: saved?.setupAnswers?.age || saved?.ageBand || "4-6",
+  });
   const [mood, setMood] = useState(saved?.mood || "");
   const [stars, setStars] = useState(saved?.stars || 5);
   const [fontScale, setFontScale] = useState(saved?.fontScale || 1);
@@ -129,21 +176,15 @@ function App() {
   const [hintVisible, setHintVisible] = useState(saved?.hintVisible || false);
   const [sessionNotice, setSessionNotice] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState(saved?.selectedActivity || null);
-  const [progress, setProgress] = useState(saved?.progress || {
-    completed: 0,
-    starsEarned: 0,
-    moodHistory: [],
-    modules: {},
-    weakAreas: {},
-  });
+  const [progress, setProgress] = useState(saved?.progress || defaultProgress);
 
   const mode = modes[ageBand];
   const setup = setupSteps[setupIndex];
-  const showCalm = !["welcome", "calm"].includes(screen);
+  const showCalm = !["welcome", "setup", "ready", "mood", "calm"].includes(screen);
 
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify({ screen, setupIndex, childName, ageBand, mood, stars, fontScale, language, attempts, hintVisible, selectedActivity, progress }));
-  }, [screen, setupIndex, childName, ageBand, mood, stars, fontScale, language, attempts, hintVisible, selectedActivity, progress]);
+    localStorage.setItem(storageKey, JSON.stringify({ screen, setupIndex, childName, ageBand, setupAnswers, mood, stars, fontScale, language, attempts, hintVisible, selectedActivity, progress }));
+  }, [screen, setupIndex, childName, ageBand, setupAnswers, mood, stars, fontScale, language, attempts, hintVisible, selectedActivity, progress]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSessionNotice(true), 15000);
@@ -167,19 +208,30 @@ function App() {
   }
 
   function chooseSetupValue(value) {
+    setSetupAnswers((current) => ({
+      ...current,
+      [setup.id]: value,
+    }));
     if (setup.id === "age") setAgeBand(value);
   }
 
-  function reward(amount, next = "reward") {
+  function restartSetup() {
+    setSetupIndex(0);
+    setHintVisible(false);
+    setAttempts(0);
+    go("setup");
+  }
+
+  function reward(amount, next = "reward", labelOverride = "") {
     setStars((value) => value + amount);
-    recordActivity(selectedActivity?.label || "Activity", amount, true);
+    recordActivity(labelOverride || selectedActivity?.label || activityFallbacks[screen] || "Activity", amount, true);
     setAttempts(0);
     setHintVisible(false);
     go(next);
   }
 
   function softMiss() {
-    const label = selectedActivity?.label || "ইমোশন গেম";
+    const label = selectedActivity?.label || activityFallbacks[screen] || "ইমোশন গেম";
     setProgress((value) => ({
       ...value,
       weakAreas: {
@@ -218,8 +270,8 @@ function App() {
       const module = current.modules?.[label] || { count: 0, stars: 0 };
       return {
         ...current,
-        completed: current.completed + (completed ? 1 : 0),
-        starsEarned: current.starsEarned + amount,
+        completed: (current.completed || 0) + (completed ? 1 : 0),
+        starsEarned: (current.starsEarned || 0) + amount,
         modules: {
           ...current.modules,
           [label]: {
@@ -247,6 +299,7 @@ function App() {
             childName={childName}
             setChildName={setChildName}
             ageBand={ageBand}
+            setupAnswers={setupAnswers}
             chooseSetupValue={chooseSetupValue}
             nextSetup={nextSetup}
             back={() => (setupIndex > 0 ? setSetupIndex(setupIndex - 1) : go("welcome"))}
@@ -254,17 +307,17 @@ function App() {
         )}
         {screen === "ready" && <Ready childName={childName} onNext={() => go("mood")} />}
         {screen === "mood" && <MoodScreen chooseMood={chooseMood} />}
-        {screen === "home" && <Home childName={childName} mode={mode} moodCopy={moodCopy} stars={stars} language={language} go={go} openActivity={openActivity} />}
+        {screen === "home" && <Home childName={childName} mode={mode} moodCopy={moodCopy} stars={stars} language={language} restartSetup={restartSetup} go={go} openActivity={openActivity} />}
         {screen === "mode" && <ModeMenu mode={mode} setAgeBand={setAgeBand} ageBand={ageBand} go={go} openActivity={openActivity} />}
         {screen === "activity" && <Activity activity={selectedActivity} mode={mode} reward={reward} go={go} />}
         {screen === "emotion" && <Emotion reward={reward} softMiss={softMiss} hintVisible={hintVisible} attempts={attempts} go={go} />}
         {screen === "story" && <Story reward={reward} softMiss={softMiss} hintVisible={hintVisible} go={go} />}
         {screen === "trace" && <Trace reward={reward} go={go} />}
-        {screen === "aac" && <Aac go={go} />}
+        {screen === "aac" && <Aac recordActivity={recordActivity} go={go} />}
         {screen === "calm" && <Calm close={() => setScreen(previousScreen || "home")} />}
         {screen === "reward" && <Reward stars={stars} go={go} />}
         {screen === "customize" && <Customize go={go} />}
-        {screen === "parent" && <ParentDashboard childName={childName} mood={mood} mode={mode} progress={progress} fontScale={fontScale} setFontScale={setFontScale} language={language} setLanguage={setLanguage} go={go} />}
+        {screen === "parent" && <ParentDashboard childName={childName} mood={mood} mode={mode} progress={progress} fontScale={fontScale} setFontScale={setFontScale} language={language} setLanguage={setLanguage} restartSetup={restartSetup} go={go} />}
         {screen === "therapist" && <TherapistMode childName={childName} go={go} />}
       </section>
       <aside className="design-notes"><p>React app</p><p>local progress</p><p>Mode 1/2/3</p></aside>
@@ -296,7 +349,8 @@ function Welcome({ onStart }) {
   );
 }
 
-function SetupScreen({ setup, setupIndex, childName, setChildName, ageBand, chooseSetupValue, nextSetup, back }) {
+function SetupScreen({ setup, setupIndex, childName, setChildName, ageBand, setupAnswers, chooseSetupValue, nextSetup, back }) {
+  const selectedValue = setup.id === "age" ? ageBand : setupAnswers[setup.id];
   return (
     <Screen>
       <button className="ghost-back" type="button" onClick={back}>‹</button>
@@ -308,8 +362,8 @@ function SetupScreen({ setup, setupIndex, childName, setChildName, ageBand, choo
         {setup.text && <p>{setup.text}</p>}
       </div>
       {setup.id === "name" && <><label className="field-label" htmlFor="childName">নাম</label><input id="childName" className="text-input" value={childName} onChange={(event) => setChildName(event.target.value)} /></>}
-      {setup.options && <div className={setup.id === "play" ? "choice-stack" : "two-actions setup-options"}>{setup.options.map(([value, icon, label, meta], index) => <button className={`${setup.id === "play" ? "wide-illustration" : "choice-card"} ${(setup.id === "age" ? ageBand === value : index === 0) ? "selected" : ""}`} type="button" key={label} onClick={() => chooseSetupValue(value)}>{icon && <span className="choice-icon">{icon}</span>}<strong>{label}</strong>{meta && <small>{meta}</small>}</button>)}</div>}
-      {setup.rows && <div className="choice-stack compact">{setup.rows.map(([value, icon, label, meta], index) => <button className={`choice-row ${index === 0 ? "selected" : ""}`} type="button" key={value}><span>{icon}</span><strong>{label}</strong>{meta && <small>{meta}</small>}</button>)}</div>}
+      {setup.options && <div className={setup.id === "play" ? "choice-stack" : "two-actions setup-options"}>{setup.options.map(([value, icon, label, meta]) => <button className={`${setup.id === "play" ? "wide-illustration" : "choice-card"} ${selectedValue === value ? "selected" : ""}`} type="button" key={label} onClick={() => chooseSetupValue(value)} aria-pressed={selectedValue === value}>{icon && <span className="choice-icon">{icon}</span>}<strong>{label}</strong>{meta && <small>{meta}</small>}</button>)}</div>}
+      {setup.rows && <div className="choice-stack compact">{setup.rows.map(([value, icon, label, meta]) => <button className={`choice-row ${selectedValue === value ? "selected" : ""}`} type="button" key={value} onClick={() => chooseSetupValue(value)} aria-pressed={selectedValue === value}><span>{icon}</span><strong>{label}</strong>{meta && <small>{meta}</small>}</button>)}</div>}
       {setup.checks && <div className="check-list">{setup.checks.map((item, index) => <label key={item}><span>{item}</span><input type="checkbox" defaultChecked={index !== 3} /></label>)}</div>}
       <button className="primary-button bottom" type="button" onClick={nextSetup}>পরবর্তী</button>
     </Screen>
@@ -325,11 +379,11 @@ function MoodScreen({ chooseMood }) {
   return <Screen><div className="screen-head centered mood-head"><h2>আজ তুমি কেমন অনুভব করছো?</h2><p>তোমার অনুভূতি জানলে আভা কোমলভাবে দিন সাজাবে।</p></div><div className="mood-column">{moods.map(([kind, face, label]) => <button className={`mood-face ${kind}`} type="button" key={label} onClick={() => chooseMood(label)}><span>{face}</span><strong>{label}</strong></button>)}</div></Screen>;
 }
 
-function Home({ childName, mode, moodCopy, stars, language, go, openActivity }) {
+function Home({ childName, mode, moodCopy, stars, language, restartSetup, go, openActivity }) {
   return (
     <Screen>
       <div className="home-top"><div><p className="eyebrow">আজকের পরিকল্পনা</p><h2>হ্যালো, {childName || "সিমা"}!</h2><p>{moodCopy}</p></div><div className="star-pill">★ {stars}</div></div>
-      <div className="offline-strip"><span>●</span>{language === "bn" ? "Offline ready · progress এই ডিভাইসে রাখা হচ্ছে" : "Offline ready · progress is saved on this device"}</div>
+      <div className="offline-strip"><span>●</span>{language === "bn" ? "Offline ready · progress এই ডিভাইসে রাখা হচ্ছে" : "Offline ready · progress is saved on this device"}<button type="button" onClick={restartSetup}>Setup</button></div>
       <div className="path-panel"><div className="mode-kicker"><span>{mode.label}</span><small>{mode.age}</small></div><h3>{mode.goal}</h3><div className="path-line">{mode.activities.slice(0, 3).map((activity) => <button type="button" key={activity[1]} onClick={() => openActivity(activity)}>{activity[0]} {activity[1]}</button>)}</div></div>
       <div className="activity-focus"><p className="eyebrow">আজকের focus</p><div className="emotion-card"><div className="face-art">{mode.hero}</div><p>{mode.focus}</p><div className="pill-row"><button type="button" onClick={() => openActivity(mode.activities[0])}>শুরু</button><button type="button" onClick={() => go("mode")}>সব activity</button></div></div></div>
       <TabBar active="home" go={go} />
@@ -467,12 +521,12 @@ function Trace({ reward, go }) {
   return <ActivityShell title="জাদুকরী আঙুল" subtitle="অক্ষর ছুঁয়ে ধীরে ধীরে আঁকো" back={() => go("home")}><div className="trace-board"><span>অ</span><div className="trace-glow" /></div><button className="primary-button bottom" type="button" onClick={() => reward(4)}>শেষ করেছি</button></ActivityShell>;
 }
 
-function Aac({ go }) {
+function Aac({ recordActivity, go }) {
   const [phrase, setPhrase] = useState("ছবিতে tap করলে বাক্য এখানে দেখা যাবে।");
   return (
     <ActivityShell title="AAC বোর্ড" subtitle="ছবিতে tap করে প্রয়োজন বলা যাবে।" back={() => go("mode")}>
       <div className="speech-output">{phrase}</div>
-      <div className="aac-grid">{["💧 আমি পানি চাই", "🍚 আমি খাবার চাই", "🤗 আলিঙ্গন চাই", "🛑 বিরতি চাই", "☁ আমি শান্ত হতে চাই", "🎲 আমি খেলতে চাই"].map((item) => <button type="button" key={item} onClick={() => setPhrase(item.slice(3))}>{item.slice(0, 2)}<span>{item.slice(3)}</span></button>)}</div>
+      <div className="aac-grid">{aacItems.map(([icon, label]) => <button type="button" key={label} onClick={() => { setPhrase(label); recordActivity("AAC বোর্ড", 0, false); }}>{icon}<span>{label}</span></button>)}</div>
     </ActivityShell>
   );
 }
@@ -498,7 +552,7 @@ function TabBar({ active, go }) {
   return <nav className="tabbar" aria-label="প্রধান নেভিগেশন">{tabs.map(([id, icon, label]) => <button className={active === id ? "active" : ""} type="button" key={id} onClick={() => go(id)}>{icon}<span>{label}</span></button>)}</nav>;
 }
 
-function ParentDashboard({ childName, mood, mode, progress, fontScale, setFontScale, language, setLanguage, go }) {
+function ParentDashboard({ childName, mood, mode, progress, fontScale, setFontScale, language, setLanguage, restartSetup, go }) {
   const moduleEntries = Object.entries(progress.modules || {}).slice(-4);
   const weakEntries = Object.entries(progress.weakAreas || {}).sort((a, b) => b[1] - a[1]).slice(0, 2);
   const recentMoods = (progress.moodHistory || []).slice(-4);
@@ -512,6 +566,7 @@ function ParentDashboard({ childName, mood, mode, progress, fontScale, setFontSc
       <div className="insight-card"><h3>Home practice</h3><p>{weakEntries.length ? `${childName} ${weakEntries[0][0]}-এ একটু help চাইছে। familiar hint দিয়ে ৫ মিনিট practice করুন।` : `${childName} এর জন্য ${mode.label} mode-এ ৫ মিনিট “${mode.activities[0][1]}” অনুশীলন রাখুন।`}</p></div>
       <div className="setting-card"><label htmlFor="fontSize">Font size</label><input id="fontSize" type="range" min="0.95" max="1.16" step="0.01" value={fontScale} onChange={(event) => setFontScale(Number(event.target.value))} /></div>
       <div className="setting-card setting-row"><span>Language</span><button type="button" onClick={() => setLanguage(language === "bn" ? "en" : "bn")}>{language === "bn" ? "বাংলা" : "English"}</button></div>
+      <button className="secondary-button setup-again" type="button" onClick={restartSetup}>Setup আবার করুন</button>
       <TabBar active="parent" go={go} />
     </Screen>
   );
