@@ -30,6 +30,7 @@ const aacItems = [
 const defaultSetupAnswers = {
   age: "4-6",
   level: "Level 1",
+  challenges: ["Speech", "Motor", "Social", "Emotional"],
   speech: "yes",
   therapy: "yes",
   play: "alone",
@@ -57,7 +58,18 @@ const setupSteps = [
       ["Level 3", "🧩", "Level 3", "বেশি সহায়তা লাগে"],
     ],
   },
-  { id: "challenge", title: "কোথায় বেশি সহায়তা দরকার?", text: "একাধিক বিষয় বেছে নেওয়া যাবে।", checks: ["💬 Speech", "🖐 Motor Skills", "🤝 Social", "🌧 Sensory", "💙 Emotional"] },
+  {
+    id: "challenge",
+    title: "কোথায় বেশি সহায়তা দরকার?",
+    text: "একাধিক বিষয় বেছে নেওয়া যাবে।",
+    checks: [
+      ["Speech", "💬 Speech"],
+      ["Motor", "🖐 Motor Skills"],
+      ["Social", "🤝 Social"],
+      ["Sensory", "🌧 Sensory"],
+      ["Emotional", "💙 Emotional"],
+    ],
+  },
   {
     id: "speech",
     title: "শিশু কি কথা বলতে পারে?",
@@ -137,6 +149,78 @@ const modes = {
   },
 };
 
+const supportActivities = {
+  aac: ["▣", "AAC বোর্ড", "ছবিতে tap করে প্রয়োজন বলো"],
+  emotion: ["◉", "ইমোশন গেম", "খুশি, কষ্ট, ভয়, অবাক চিনো"],
+  story: ["☘", "সোশ্যাল স্টোরি", "হ্যালো বলা ও সহজ সিদ্ধান্ত"],
+  calm: ["☁", "শান্ত শ্বাস", "চাপ ছাড়া breathing activity"],
+  bubble: ["🫧", "বুদবুদ খেলা", "বড় bubble tap করলে আলতোভাবে ফাটবে"],
+};
+
+function placeFirst(activities, activity) {
+  const withoutDuplicate = activities.filter((item) => item[1] !== activity[1]);
+  return [activity, ...withoutDuplicate];
+}
+
+function buildDailyPlan(mode, answers, mood) {
+  const challenges = answers.challenges || [];
+  let activities = [...mode.activities];
+  const reasons = [];
+  let focus = mode.focus;
+  let hero = mode.hero;
+  let planLabel = `${mode.label} · ${mode.age}`;
+
+  if (answers.speech !== "yes" || challenges.includes("Speech")) {
+    activities = placeFirst(activities, supportActivities.aac);
+    focus = "ছবিতে tap করে প্রয়োজন বলো";
+    hero = "▣";
+    reasons.push("Speech support আগে");
+  }
+
+  if (challenges.includes("Social")) {
+    activities = placeFirst(placeFirst(activities, supportActivities.story), supportActivities.emotion);
+    focus = "মুখ দেখে অনুভূতি চেনো";
+    hero = "☺";
+    reasons.push("Social practice আগে");
+  }
+
+  if (challenges.includes("Sensory") || answers.level === "Level 3" || mood === "মন খারাপ") {
+    activities = placeFirst(activities, supportActivities.calm);
+    focus = "আগে একটু শান্ত হই";
+    hero = "☁";
+    reasons.push("Sensory calm আগে");
+  }
+
+  if (answers.age === "1-3" || mode.label === "অনুভব") {
+    activities = placeFirst(activities, supportActivities.bubble);
+    if (!challenges.includes("Speech") && mood !== "মন খারাপ") {
+      focus = "বুদবুদ ধরো";
+      hero = "🫧";
+    }
+  }
+
+  if (mood === "মাঝামাঝি") {
+    reasons.push("আজ familiar সহজ activity");
+  }
+
+  if (mood === "ভালো আছি") {
+    reasons.push("নতুন challenge ধীরে");
+  }
+
+  if (answers.play === "caregiver") {
+    reasons.push("Caregiver guided");
+  }
+
+  return {
+    ...mode,
+    activities,
+    focus,
+    hero,
+    planLabel,
+    reason: reasons.slice(0, 2).join(" · ") || "আজকের plan প্রস্তুত",
+  };
+}
+
 function loadInitialState() {
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey));
@@ -187,6 +271,7 @@ function App() {
 
   const mode = modes[ageBand];
   const setup = setupSteps[setupIndex];
+  const dailyPlan = useMemo(() => buildDailyPlan(mode, setupAnswers, mood), [mode, setupAnswers, mood]);
   const showCalm = !["welcome", "setup", "ready", "mood", "calm"].includes(screen);
 
   useEffect(() => {
@@ -220,6 +305,17 @@ function App() {
       [setup.id]: value,
     }));
     if (setup.id === "age") setAgeBand(value);
+  }
+
+  function toggleChallenge(value) {
+    setSetupAnswers((current) => {
+      const currentChallenges = current.challenges || [];
+      const exists = currentChallenges.includes(value);
+      return {
+        ...current,
+        challenges: exists ? currentChallenges.filter((item) => item !== value) : [...currentChallenges, value],
+      };
+    });
   }
 
   function restartSetup() {
@@ -271,8 +367,9 @@ function App() {
 
   function openActivity(activity) {
     const [icon, label, description] = activity;
-    setSelectedActivity({ icon, label, description, mode: mode.label });
-    if (label.includes("AAC")) go("aac");
+    setSelectedActivity({ icon, label, description, mode: dailyPlan.label });
+    if (label.includes("শান্ত")) go("calm");
+    else if (label.includes("AAC")) go("aac");
     else if (label.includes("ইমোশন")) go("emotion");
     else if (label.includes("স্টোরি")) go("story");
     else if (label.includes("ট্রেসিং")) go("trace");
@@ -325,14 +422,15 @@ function App() {
             ageBand={ageBand}
             setupAnswers={setupAnswers}
             chooseSetupValue={chooseSetupValue}
+            toggleChallenge={toggleChallenge}
             nextSetup={nextSetup}
             back={() => (setupIndex > 0 ? setSetupIndex(setupIndex - 1) : go("welcome"))}
           />
         )}
         {screen === "ready" && <Ready childName={childName} onNext={() => go("mood")} />}
         {screen === "mood" && <MoodScreen chooseMood={chooseMood} />}
-        {screen === "home" && <Home childName={childName} mode={mode} moodCopy={moodCopy} stars={stars} language={language} world={world} touchWorld={touchWorld} restartSetup={restartSetup} go={go} openActivity={openActivity} />}
-        {screen === "mode" && <ModeMenu mode={mode} setAgeBand={setAgeBand} ageBand={ageBand} go={go} openActivity={openActivity} />}
+        {screen === "home" && <Home childName={childName} mode={dailyPlan} moodCopy={moodCopy} stars={stars} language={language} world={world} touchWorld={touchWorld} restartSetup={restartSetup} go={go} openActivity={openActivity} />}
+        {screen === "mode" && <ModeMenu mode={dailyPlan} setAgeBand={setAgeBand} ageBand={ageBand} go={go} openActivity={openActivity} />}
         {screen === "activity" && <Activity activity={selectedActivity} mode={mode} reward={reward} go={go} />}
         {screen === "emotion" && <Emotion reward={reward} softMiss={softMiss} hintVisible={hintVisible} attempts={attempts} go={go} />}
         {screen === "story" && <Story reward={reward} softMiss={softMiss} hintVisible={hintVisible} go={go} />}
@@ -341,7 +439,7 @@ function App() {
         {screen === "calm" && <Calm close={() => setScreen(previousScreen || "home")} />}
         {screen === "reward" && <Reward stars={stars} go={go} />}
         {screen === "customize" && <Customize go={go} />}
-        {screen === "parent" && <ParentDashboard childName={childName} mood={mood} mode={mode} progress={progress} fontScale={fontScale} setFontScale={setFontScale} language={language} setLanguage={setLanguage} restartSetup={restartSetup} go={go} />}
+        {screen === "parent" && <ParentDashboard childName={childName} mood={mood} mode={dailyPlan} progress={progress} fontScale={fontScale} setFontScale={setFontScale} language={language} setLanguage={setLanguage} restartSetup={restartSetup} go={go} />}
         {screen === "therapist" && <TherapistMode childName={childName} go={go} />}
       </section>
     </main>
@@ -372,8 +470,9 @@ function Welcome({ onStart }) {
   );
 }
 
-function SetupScreen({ setup, setupIndex, childName, setChildName, ageBand, setupAnswers, chooseSetupValue, nextSetup, back }) {
+function SetupScreen({ setup, setupIndex, childName, setChildName, ageBand, setupAnswers, chooseSetupValue, toggleChallenge, nextSetup, back }) {
   const selectedValue = setup.id === "age" ? ageBand : setupAnswers[setup.id];
+  const selectedChallenges = setupAnswers.challenges || [];
   return (
     <Screen>
       <button className="ghost-back" type="button" onClick={back}>‹</button>
@@ -387,7 +486,7 @@ function SetupScreen({ setup, setupIndex, childName, setChildName, ageBand, setu
       {setup.id === "name" && <><label className="field-label" htmlFor="childName">নাম</label><input id="childName" className="text-input" value={childName} onChange={(event) => setChildName(event.target.value)} /></>}
       {setup.options && <div className={setup.id === "play" ? "choice-stack" : "two-actions setup-options"}>{setup.options.map(([value, icon, label, meta]) => <button className={`${setup.id === "play" ? "wide-illustration" : "choice-card"} ${selectedValue === value ? "selected" : ""}`} type="button" key={label} onClick={() => chooseSetupValue(value)} aria-pressed={selectedValue === value}>{icon && <span className="choice-icon">{icon}</span>}<strong>{label}</strong>{meta && <small>{meta}</small>}</button>)}</div>}
       {setup.rows && <div className="choice-stack compact">{setup.rows.map(([value, icon, label, meta]) => <button className={`choice-row ${selectedValue === value ? "selected" : ""}`} type="button" key={value} onClick={() => chooseSetupValue(value)} aria-pressed={selectedValue === value}><span>{icon}</span><strong>{label}</strong>{meta && <small>{meta}</small>}</button>)}</div>}
-      {setup.checks && <div className="check-list">{setup.checks.map((item, index) => <label key={item}><span>{item}</span><input type="checkbox" defaultChecked={index !== 3} /></label>)}</div>}
+      {setup.checks && <div className="check-list">{setup.checks.map(([value, label]) => <label key={value}><span>{label}</span><input type="checkbox" checked={selectedChallenges.includes(value)} onChange={() => toggleChallenge(value)} /></label>)}</div>}
       <button className="primary-button bottom" type="button" onClick={nextSetup}>পরবর্তী</button>
     </Screen>
   );
@@ -423,7 +522,7 @@ function Home({ childName, mode, moodCopy, stars, language, world, touchWorld, r
       </button>
       <div className="world-prompt">{world.taps === 0 ? "আভাকে আলতো করে ছুঁয়ে দেখো" : world.mood === "happy" ? "আভা খুশি হয়েছে" : "জোনাকি জ্বলছে"}</div>
       <div className="offline-strip"><span>●</span>{language === "bn" ? "Offline ready" : "Offline ready"}<button type="button" onClick={restartSetup}>Setup</button></div>
-      <div className="path-panel world-activities"><div className="mode-kicker"><span>{mode.label}</span><small>{mode.age}</small></div><div className="path-line">{mode.activities.slice(0, 3).map((activity) => <button type="button" key={activity[1]} onClick={() => openActivity(activity)}>{activity[0]} {activity[1]}</button>)}</div></div>
+      <div className="path-panel world-activities"><div className="mode-kicker"><span>{mode.planLabel}</span><small>{mode.reason}</small></div><div className="path-line">{mode.activities.slice(0, 3).map((activity) => <button type="button" key={activity[1]} onClick={() => openActivity(activity)}>{activity[0]} {activity[1]}</button>)}</div></div>
       <div className="gentle-start"><button type="button" onClick={() => openActivity(mode.activities[0])}>{mode.hero} শুরু</button><button type="button" onClick={() => go("mode")}>সব খেলা</button></div>
       <TabBar active="home" go={go} />
     </Screen>
