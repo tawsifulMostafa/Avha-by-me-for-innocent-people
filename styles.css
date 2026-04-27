@@ -1203,20 +1203,6 @@ input[type="checkbox"] {
   background: rgba(255, 244, 237, 0.07);
 }
 
-.design-notes {
-  display: flex;
-  gap: 10px;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.design-notes p {
-  margin: 0;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-}
-
 @media (max-width: 520px) {
   .app-shell {
     padding: 0;
@@ -1226,9 +1212,5 @@ input[type="checkbox"] {
     width: 100vw;
     min-height: 100vh;
     border-radius: 0;
-  }
-
-  .design-notes {
-    display: none;
   }
 }

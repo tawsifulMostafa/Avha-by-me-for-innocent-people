@@ -320,7 +320,6 @@ function App() {
         {screen === "parent" && <ParentDashboard childName={childName} mood={mood} mode={mode} progress={progress} fontScale={fontScale} setFontScale={setFontScale} language={language} setLanguage={setLanguage} restartSetup={restartSetup} go={go} />}
         {screen === "therapist" && <TherapistMode childName={childName} go={go} />}
       </section>
-      <aside className="design-notes"><p>React app</p><p>local progress</p><p>Mode 1/2/3</p></aside>
     </main>
   );
 }
