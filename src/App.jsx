@@ -176,6 +176,13 @@ function App() {
   const [hintVisible, setHintVisible] = useState(saved?.hintVisible || false);
   const [sessionNotice, setSessionNotice] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState(saved?.selectedActivity || null);
+  const [world, setWorld] = useState(saved?.world || {
+    glow: 2,
+    fireflies: 3,
+    flowers: 1,
+    taps: 0,
+    mood: "calm",
+  });
   const [progress, setProgress] = useState(saved?.progress || defaultProgress);
 
   const mode = modes[ageBand];
@@ -183,8 +190,8 @@ function App() {
   const showCalm = !["welcome", "setup", "ready", "mood", "calm"].includes(screen);
 
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify({ screen, setupIndex, childName, ageBand, setupAnswers, mood, stars, fontScale, language, attempts, hintVisible, selectedActivity, progress }));
-  }, [screen, setupIndex, childName, ageBand, setupAnswers, mood, stars, fontScale, language, attempts, hintVisible, selectedActivity, progress]);
+    localStorage.setItem(storageKey, JSON.stringify({ screen, setupIndex, childName, ageBand, setupAnswers, mood, stars, fontScale, language, attempts, hintVisible, selectedActivity, world, progress }));
+  }, [screen, setupIndex, childName, ageBand, setupAnswers, mood, stars, fontScale, language, attempts, hintVisible, selectedActivity, world, progress]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSessionNotice(true), 15000);
@@ -224,6 +231,13 @@ function App() {
 
   function reward(amount, next = "reward", labelOverride = "") {
     setStars((value) => value + amount);
+    setWorld((value) => ({
+      ...value,
+      glow: Math.min(8, value.glow + 1),
+      fireflies: Math.min(10, value.fireflies + 1),
+      flowers: Math.min(7, value.flowers + 1),
+      mood: "happy",
+    }));
     recordActivity(labelOverride || selectedActivity?.label || activityFallbacks[screen] || "Activity", amount, true);
     setAttempts(0);
     setHintVisible(false);
@@ -263,6 +277,16 @@ function App() {
     else if (label.includes("স্টোরি")) go("story");
     else if (label.includes("ট্রেসিং")) go("trace");
     else go("activity");
+  }
+
+  function touchWorld() {
+    setWorld((value) => ({
+      ...value,
+      taps: value.taps + 1,
+      fireflies: Math.min(10, value.fireflies + (value.taps % 2 === 0 ? 1 : 0)),
+      glow: Math.min(8, value.glow + 0.2),
+      mood: value.mood === "sleepy" ? "calm" : "sleepy",
+    }));
   }
 
   function recordActivity(label, amount, completed) {
@@ -307,7 +331,7 @@ function App() {
         )}
         {screen === "ready" && <Ready childName={childName} onNext={() => go("mood")} />}
         {screen === "mood" && <MoodScreen chooseMood={chooseMood} />}
-        {screen === "home" && <Home childName={childName} mode={mode} moodCopy={moodCopy} stars={stars} language={language} restartSetup={restartSetup} go={go} openActivity={openActivity} />}
+        {screen === "home" && <Home childName={childName} mode={mode} moodCopy={moodCopy} stars={stars} language={language} world={world} touchWorld={touchWorld} restartSetup={restartSetup} go={go} openActivity={openActivity} />}
         {screen === "mode" && <ModeMenu mode={mode} setAgeBand={setAgeBand} ageBand={ageBand} go={go} openActivity={openActivity} />}
         {screen === "activity" && <Activity activity={selectedActivity} mode={mode} reward={reward} go={go} />}
         {screen === "emotion" && <Emotion reward={reward} softMiss={softMiss} hintVisible={hintVisible} attempts={attempts} go={go} />}
@@ -378,13 +402,29 @@ function MoodScreen({ chooseMood }) {
   return <Screen><div className="screen-head centered mood-head"><h2>আজ তুমি কেমন অনুভব করছো?</h2><p>তোমার অনুভূতি জানলে আভা কোমলভাবে দিন সাজাবে।</p></div><div className="mood-column">{moods.map(([kind, face, label]) => <button className={`mood-face ${kind}`} type="button" key={label} onClick={() => chooseMood(label)}><span>{face}</span><strong>{label}</strong></button>)}</div></Screen>;
 }
 
-function Home({ childName, mode, moodCopy, stars, language, restartSetup, go, openActivity }) {
+function Home({ childName, mode, moodCopy, stars, language, world, touchWorld, restartSetup, go, openActivity }) {
+  const fireflies = Array.from({ length: Math.min(10, Math.floor(world.fireflies)) });
+  const flowers = Array.from({ length: Math.min(7, Math.floor(world.flowers)) });
   return (
     <Screen>
-      <div className="home-top"><div><p className="eyebrow">আজকের পরিকল্পনা</p><h2>হ্যালো, {childName || "সিমা"}!</h2><p>{moodCopy}</p></div><div className="star-pill">★ {stars}</div></div>
-      <div className="offline-strip"><span>●</span>{language === "bn" ? "Offline ready · progress এই ডিভাইসে রাখা হচ্ছে" : "Offline ready · progress is saved on this device"}<button type="button" onClick={restartSetup}>Setup</button></div>
-      <div className="path-panel"><div className="mode-kicker"><span>{mode.label}</span><small>{mode.age}</small></div><h3>{mode.goal}</h3><div className="path-line">{mode.activities.slice(0, 3).map((activity) => <button type="button" key={activity[1]} onClick={() => openActivity(activity)}>{activity[0]} {activity[1]}</button>)}</div></div>
-      <div className="activity-focus"><p className="eyebrow">আজকের focus</p><div className="emotion-card"><div className="face-art">{mode.hero}</div><p>{mode.focus}</p><div className="pill-row"><button type="button" onClick={() => openActivity(mode.activities[0])}>শুরু</button><button type="button" onClick={() => go("mode")}>সব activity</button></div></div></div>
+      <div className="home-top world-top"><div><p className="eyebrow">আভার শান্ত জগৎ</p><h2>হ্যালো, {childName || "সিমা"}!</h2></div><div className="star-pill">★ {stars}</div></div>
+      <button className={`calm-world ${world.mood}`} type="button" onClick={touchWorld} aria-label="আভার জগৎ ছুঁয়ে দেখো">
+        <div className="world-sky" style={{ "--world-glow": world.glow }}>
+          {fireflies.map((_, index) => <span className={`firefly firefly-${(index % 6) + 1}`} key={index}>✦</span>)}
+          <div className="moon-glow">☾</div>
+          <div className="aava-companion">
+            <span className="cloud-face">{world.mood === "happy" ? "😊" : world.mood === "sleepy" ? "😌" : "🙂"}</span>
+            <small>আভা</small>
+          </div>
+          <div className="world-ground">
+            {flowers.map((_, index) => <span key={index}>✿</span>)}
+          </div>
+        </div>
+      </button>
+      <div className="world-prompt">{world.taps === 0 ? "আভাকে আলতো করে ছুঁয়ে দেখো" : world.mood === "happy" ? "আভা খুশি হয়েছে" : "জোনাকি জ্বলছে"}</div>
+      <div className="offline-strip"><span>●</span>{language === "bn" ? "Offline ready" : "Offline ready"}<button type="button" onClick={restartSetup}>Setup</button></div>
+      <div className="path-panel world-activities"><div className="mode-kicker"><span>{mode.label}</span><small>{mode.age}</small></div><div className="path-line">{mode.activities.slice(0, 3).map((activity) => <button type="button" key={activity[1]} onClick={() => openActivity(activity)}>{activity[0]} {activity[1]}</button>)}</div></div>
+      <div className="gentle-start"><button type="button" onClick={() => openActivity(mode.activities[0])}>{mode.hero} শুরু</button><button type="button" onClick={() => go("mode")}>সব খেলা</button></div>
       <TabBar active="home" go={go} />
     </Screen>
   );

@@ -482,6 +482,10 @@ input[type="checkbox"] {
   margin-top: 28px;
 }
 
+.world-top {
+  margin-top: 22px;
+}
+
 .star-pill,
 .small-chip {
   display: inline-flex;
@@ -510,6 +514,154 @@ input[type="checkbox"] {
   background: rgba(185, 217, 168, 0.09);
   font-size: 13px;
   font-weight: 700;
+}
+
+.calm-world {
+  width: 100%;
+  min-height: 330px;
+  padding: 0;
+  margin-top: 14px;
+  overflow: hidden;
+  border-radius: 30px;
+  border: 1px solid rgba(255, 244, 237, 0.12);
+  background: transparent;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
+}
+
+.world-sky {
+  --world-glow: 2;
+  position: relative;
+  min-height: 330px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255, 211, 111, calc(var(--world-glow) * 0.025)), transparent 38%),
+    radial-gradient(circle at 32% 22%, rgba(216, 154, 170, 0.28), transparent 22%),
+    linear-gradient(180deg, #252033 0%, #171722 65%, #232131 100%);
+}
+
+.world-sky::after {
+  content: "";
+  position: absolute;
+  left: -12%;
+  right: -12%;
+  bottom: -38px;
+  height: 128px;
+  border-radius: 50% 50% 0 0;
+  background: linear-gradient(180deg, rgba(64, 54, 78, 0.96), rgba(32, 29, 43, 0.98));
+}
+
+.moon-glow {
+  position: absolute;
+  top: 28px;
+  right: 36px;
+  color: #ffe0a5;
+  font-size: 42px;
+  text-shadow: 0 0 28px rgba(255, 211, 111, 0.42);
+}
+
+.aava-companion {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  transform: translate(-50%, -50%);
+  color: var(--text);
+  font-weight: 900;
+}
+
+.cloud-face {
+  width: 136px;
+  height: 96px;
+  display: grid;
+  place-items: center;
+  border-radius: 50px;
+  font-size: 56px;
+  background: radial-gradient(circle at 35% 28%, #f3d5dc, #b98aa5 68%, #80679b);
+  box-shadow: 0 0 42px rgba(216, 154, 170, 0.35);
+  animation: softFloat 4s ease-in-out infinite;
+}
+
+@keyframes softFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.firefly {
+  position: absolute;
+  z-index: 1;
+  color: #ffe0a5;
+  text-shadow: 0 0 16px rgba(255, 211, 111, 0.75);
+  animation: twinkle 2.8s ease-in-out infinite;
+}
+
+.firefly-1 { left: 12%; top: 20%; }
+.firefly-2 { left: 25%; top: 36%; animation-delay: 0.4s; }
+.firefly-3 { right: 22%; top: 30%; animation-delay: 0.8s; }
+.firefly-4 { right: 12%; top: 52%; animation-delay: 1.2s; }
+.firefly-5 { left: 18%; top: 58%; animation-delay: 1.6s; }
+.firefly-6 { left: 48%; top: 18%; animation-delay: 2s; }
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+.world-ground {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 18px;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  color: #d9a5bd;
+  font-size: 26px;
+}
+
+.world-prompt {
+  min-height: 34px;
+  display: grid;
+  place-items: center;
+  margin-top: 8px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.world-activities {
+  margin: 10px 0 0;
+  padding: 14px;
+}
+
+.gentle-start {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+  margin-bottom: 82px;
+}
+
+.gentle-start button {
+  min-height: 50px;
+  border-radius: 18px;
+  color: var(--text);
+  background: rgba(216, 154, 170, 0.24);
+  font-weight: 900;
 }
 
 .offline-strip button {
@@ -564,6 +716,11 @@ input[type="checkbox"] {
   gap: 10px;
   overflow-x: auto;
   padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.path-line::-webkit-scrollbar {
+  display: none;
 }
 
 .path-line button,
