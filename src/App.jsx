@@ -1,733 +1,616 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-const storageKey = "aava-progress-v1";
+const storageKey = "aava-v1-mvp";
 
-const defaultProgress = {
-  completed: 0,
-  starsEarned: 0,
-  moodHistory: [],
-  modules: {},
-  weakAreas: {},
-};
-
-const activityFallbacks = {
-  emotion: "ইমোশন গেম",
-  story: "সোশ্যাল স্টোরি",
-  trace: "বাংলা ট্রেসিং",
-  aac: "AAC বোর্ড",
-  activity: "Activity",
-};
-
-const aacItems = [
-  ["💧", "আমি পানি চাই"],
-  ["🍚", "আমি খাবার চাই"],
-  ["🤗", "আলিঙ্গন চাই"],
-  ["🛑", "বিরতি চাই"],
-  ["☁", "আমি শান্ত হতে চাই"],
-  ["🎲", "আমি খেলতে চাই"],
+const moodOptions = [
+  { id: "good", label: "ভালো আছি", emoji: "😊", note: "আজ একটু নতুন জিনিসও চেষ্টা করা যাবে।" },
+  { id: "okay", label: "মাঝামাঝি", emoji: "😐", note: "আজ পরিচিত ধাপে ধাপে খেলি।" },
+  { id: "sad", label: "মন খারাপ", emoji: "😔", note: "আজ সহজ, শান্ত, পরিচিত পছন্দ রাখা হবে।" },
 ];
 
-const defaultSetupAnswers = {
-  age: "4-6",
-  level: "Level 1",
-  challenges: ["Speech", "Motor", "Social", "Emotional"],
-  speech: "yes",
-  therapy: "yes",
-  play: "alone",
+const defaultSetup = {
+  childName: "",
+  speech: "some",
+  focus: "communication",
+  playMode: "caregiver",
 };
 
-const setupSteps = [
-  { id: "name", eyebrow: "প্রথম সেটআপ", title: "শিশুর নাম লিখুন", text: "নামের মাধ্যমে আভা প্রতিদিনের অভিজ্ঞতা সাজাবে।" },
-  {
-    id: "age",
-    title: "শিশুর বয়স কত?",
-    text: "বয়স অনুযায়ী mode এবং activity সাজানো হবে।",
-    options: [
-      ["1-3", "🧸", "১-৩ বছর", "অনুভব"],
-      ["4-6", "🧩", "৪-৬ বছর", "বিকাশ"],
-      ["7-9", "📘", "৭-৯ বছর", "স্বাধীনতা"],
-    ],
-  },
-  {
-    id: "level",
-    title: "অটিজমের স্তর",
-    text: "সহায়তার ধরন বুঝতে এটি ব্যবহার হবে।",
-    rows: [
-      ["Level 1", "🧩", "Level 1", "সামান্য সহায়তা লাগে"],
-      ["Level 2", "🧩", "Level 2", "মাঝারি সহায়তা লাগে"],
-      ["Level 3", "🧩", "Level 3", "বেশি সহায়তা লাগে"],
-    ],
-  },
-  {
-    id: "challenge",
-    title: "কোথায় বেশি সহায়তা দরকার?",
-    text: "একাধিক বিষয় বেছে নেওয়া যাবে।",
-    checks: [
-      ["Speech", "💬 Speech"],
-      ["Motor", "🖐 Motor Skills"],
-      ["Social", "🤝 Social"],
-      ["Sensory", "🌧 Sensory"],
-      ["Emotional", "💙 Emotional"],
-    ],
-  },
-  {
-    id: "speech",
-    title: "শিশু কি কথা বলতে পারে?",
-    icon: "•••",
-    rows: [
-      ["yes", "🙂", "হ্যাঁ"],
-      ["no", "😐", "না"],
-      ["some", "🥺", "কিছু কিছু শব্দ"],
-    ],
-  },
-  {
-    id: "therapy",
-    title: "আগে কোনো থেরাপি নেওয়া হয়েছে?",
-    icon: "📋",
-    options: [
-      ["yes", "", "হ্যাঁ", ""],
-      ["no", "", "না", ""],
-    ],
-  },
-  {
-    id: "play",
-    title: "প্লে মোড",
-    text: "আজ কীভাবে ব্যবহার করবে?",
-    options: [
-      ["alone", "👧", "শিশু একা", ""],
-      ["caregiver", "👩‍👧", "কেয়ারগিভারের সাথে", ""],
-    ],
-  },
-];
+const requestGuides = {
+  water: "শিশু ছবি বাছলে বাক্যটি জোরে পড়ুন: ‘আমি পানি চাই’। তারপর সম্ভব হলে সত্যি পানি দেখান বা দিন।",
+  food: "খাবারের ছবি বাছলে ‘আমি খাবার চাই’ বলুন। নাশতা বা খাবারের সময়ের সাথে মিলিয়ে practice করুন।",
+  break: "বিরতি কার্ড বাছলে সঙ্গে সঙ্গে ৩০ সেকেন্ড quiet break দিন, যাতে card আর real break-এর সম্পর্ক তৈরি হয়।",
+  play: "খেলতে চাই card বাছলে child-এর পছন্দের toy বা simple play option দেখান।",
+};
 
-const modes = {
-  "1-3": {
-    label: "অনুভব",
-    age: "১-৩ বছর",
-    goal: "Screen familiarity, touch response, parent-guided bonding.",
-    focus: "বুদবুদ ধরো",
-    hero: "🫧",
-    activities: [
-      ["✨", "Sound Touch", "স্ক্রিন ছুঁলে জোনাকি আর নরম পিয়ানো"],
-      ["🫧", "বুদবুদ খেলা", "বড় bubble tap করলে আলতোভাবে ফাটবে"],
-      ["🎨", "রঙের ছোঁয়া", "লাল, নীল, হলুদ বড় আকারে"],
-      ["অ", "স্বরবর্ণ দর্শন", "অক্ষর নিজে নাচবে ও উচ্চারণ হবে"],
+const requestObjects = {
+  water: { label: "পানি", icon: "💧" },
+  food: { label: "খাবার", icon: "🍚" },
+  break: { label: "বিরতি", icon: "☁" },
+  play: { label: "খেলা", icon: "🧩" },
+};
+
+const requestSets = {
+  easy: [
+    { id: "water", icon: "💧", label: "পানি", sentence: "আমি পানি চাই", match: ["water", "food"] },
+    { id: "break", icon: "☁", label: "বিরতি", sentence: "আমি বিরতি চাই", match: ["break", "play"] },
+  ],
+  medium: [
+    { id: "water", icon: "💧", label: "পানি", sentence: "আমি পানি চাই", match: ["water", "food"] },
+    { id: "food", icon: "🍚", label: "খাবার", sentence: "আমি খাবার চাই", match: ["food", "water"] },
+    { id: "break", icon: "☁", label: "বিরতি", sentence: "আমি বিরতি চাই", match: ["break", "play"] },
+  ],
+  broad: [
+    { id: "water", icon: "💧", label: "পানি", sentence: "আমি পানি চাই", match: ["water", "food"] },
+    { id: "food", icon: "🍚", label: "খাবার", sentence: "আমি খাবার চাই", match: ["food", "water"] },
+    { id: "break", icon: "☁", label: "বিরতি", sentence: "আমি বিরতি চাই", match: ["break", "play"] },
+    { id: "play", icon: "🧩", label: "খেলা", sentence: "আমি খেলতে চাই", match: ["play", "break"] },
+  ],
+};
+
+const emotionSets = {
+  easy: {
+    scene: "🙂",
+    sceneLabel: "নরম হাসি",
+    correct: "happy",
+    choices: [
+      { id: "happy", icon: "🙂", label: "খুশি" },
+      { id: "sad", icon: "😢", label: "কষ্ট" },
     ],
-    guide: "এখন শিশুকে হাত দিয়ে বুদবুদ ধরতে বলুন এবং সাথে ‘ফাটো ফাটো’ বলুন।",
+    hint: "হাসিটা দেখো। যে মুখে নরম হাসি আছে সে খুশি।",
+    guide: "মুখের সব detail ব্যাখ্যা না করে শুধু হাসি বা চোখের দিকে ইঙ্গিত করুন। child answer না দিলে নিজে model করে আবার জিজ্ঞেস করুন।",
+    success: "খুশি মুখ চেনা গেল।",
   },
-  "4-6": {
-    label: "বিকাশ",
-    age: "৪-৬ বছর",
-    goal: "Learning, emotion recognition, social communication.",
-    focus: "এই মুখটি কী অনুভব করছে?",
-    hero: "☺",
-    activities: [
-      ["✍", "বাংলা ট্রেসিং", "অ থেকে ঔ এবং ১ থেকে ১০"],
-      ["◉", "ইমোশন গেম", "খুশি, কষ্ট, ভয়, অবাক চিনো"],
-      ["☘", "সোশ্যাল স্টোরি", "হ্যালো বলা ও সহজ সিদ্ধান্ত"],
-      ["▣", "AAC বোর্ড", "ছবিতে tap করে প্রয়োজন বলো"],
-      ["◌", "মেমরি কার্ড", "জোড়া মিলিয়ে স্মৃতি অনুশীলন"],
-      ["△", "আকার চেনা", "Circle, square, triangle sort"],
+  medium: {
+    scene: "😢",
+    sceneLabel: "চোখে জল",
+    correct: "sad",
+    choices: [
+      { id: "happy", icon: "🙂", label: "খুশি" },
+      { id: "sad", icon: "😢", label: "কষ্ট" },
+      { id: "scared", icon: "😨", label: "ভয়" },
     ],
-    guide: "আজ পরিচিত emotion card দিয়ে শুরু করুন। ভুল হলে কোনো শব্দ নেই, ঠিক হলে star।",
+    hint: "চোখে জল আছে। তাই এই মুখ কষ্ট পাচ্ছে।",
+    guide: "বলুন ‘চোখে জল মানে কষ্ট লাগছে’। child যদি confuse হয়, দুইটা choice-এ নামিয়ে আনুন।",
+    success: "কষ্টের মুখ চেনা গেল।",
   },
-  "7-9": {
-    label: "স্বাধীনতা",
-    age: "৭-৯ বছর",
-    goal: "Daily life skills, routine, reasoning, social thinking.",
-    focus: "বাইরে বৃষ্টি হচ্ছে, কী পরবে?",
-    hero: "☔",
-    activities: [
-      ["☑", "Routine Maker", "ব্রাশ → গোসল → নাস্তা সাজাও"],
-      ["🧥", "Dressing Puzzle", "আবহাওয়া দেখে পোশাক বেছে নাও"],
-      ["🍎", "Food Sorting", "Healthy আর unhealthy আলাদা করো"],
-      ["🛡", "Safety Rules", "রাস্তা ও অপরিচিত মানুষ নিয়ে সিদ্ধান্ত"],
-      ["ব", "শব্দ গঠন", "ব + ক = বক"],
-      ["➕", "সংখ্যার জগত", "১ থেকে ১০০ এবং ছোট যোগ-বিয়োগ"],
+  broad: {
+    scene: "😨",
+    sceneLabel: "চমকে গেছে",
+    correct: "scared",
+    choices: [
+      { id: "happy", icon: "🙂", label: "খুশি" },
+      { id: "sad", icon: "😢", label: "কষ্ট" },
+      { id: "scared", icon: "😨", label: "ভয়" },
     ],
-    guide: "আজ daily routine puzzle দিয়ে শুরু করুন, তারপর একটিমাত্র reasoning question দিন।",
+    hint: "চোখ বড় হয়ে গেছে। সে ভয় পেয়েছে।",
+    guide: "একবার choice গুলো দেখিয়ে নাম বলুন। child answer করার আগে আপনি ভয় পাওয়া face একটু enact করতে পারেন।",
+    success: "ভয়ের মুখ চেনা গেল।",
   },
 };
 
-const supportActivities = {
-  aac: ["▣", "AAC বোর্ড", "ছবিতে tap করে প্রয়োজন বলো"],
-  emotion: ["◉", "ইমোশন গেম", "খুশি, কষ্ট, ভয়, অবাক চিনো"],
-  story: ["☘", "সোশ্যাল স্টোরি", "হ্যালো বলা ও সহজ সিদ্ধান্ত"],
-  calm: ["☁", "শান্ত শ্বাস", "চাপ ছাড়া breathing activity"],
-  bubble: ["🫧", "বুদবুদ খেলা", "বড় bubble tap করলে আলতোভাবে ফাটবে"],
-  caregiver: ["👨‍👩‍👧", "Parent Guided Play", "কেয়ারগিভারের সাথে ধাপে ধাপে activity করুন"],
+const socialSets = {
+  easy: {
+    sceneTitle: "কেউ হাত নেড়ে hello বলছে",
+    sceneVisual: ["👦", "👋", "👧"],
+    correct: "say-hello",
+    choices: [
+      { id: "say-hello", icon: "👋", label: "হ্যালো বলি" },
+      { id: "walk-away", icon: "🚶", label: "চলে যাই" },
+    ],
+    hint: "যখন কেউ hello বলে, তখন নরম করে hello বললে ভালো লাগে।",
+    guide: "আপনি আগে নিজে হাত নেড়ে ‘হ্যালো’ model করুন। child শুধু picture বাছলেও চলবে। repeat করতে চাপ দেবেন না।",
+    success: "হ্যালো মানুষকে স্বাগত মনে করায়।",
+  },
+  medium: {
+    sceneTitle: "বন্ধু কাঁদছে",
+    sceneVisual: ["🧒", "😢", "🧸"],
+    correct: "offer-toy",
+    choices: [
+      { id: "offer-toy", icon: "🧸", label: "খেলনা দিই" },
+      { id: "laugh", icon: "😆", label: "হাসি" },
+      { id: "leave", icon: "🚶", label: "চলে যাই" },
+    ],
+    hint: "বন্ধু কাঁদলে নরমভাবে সাহায্য করা যায়।",
+    guide: "বলুন ‘কাঁদলে আমরা help করি’। toy বা tissue এর মতো concrete help দেখালে child সহজে বুঝবে।",
+    success: "সাহায্য করলে বন্ধু একটু ভালো বোধ করতে পারে।",
+  },
+  broad: {
+    sceneTitle: "দুইজন মিলে পালা করে খেলছে",
+    sceneVisual: ["🧒", "🎲", "🧒"],
+    correct: "wait-turn",
+    choices: [
+      { id: "grab", icon: "✋", label: "ছিনিয়ে নিই" },
+      { id: "wait-turn", icon: "⏳", label: "অপেক্ষা করি" },
+      { id: "cry", icon: "😢", label: "কাঁদি" },
+    ],
+    hint: "পালা করে খেললে সবার খেলতে সুযোগ হয়।",
+    guide: "একটা real toy নিয়ে ‘এখন আমার পালা, পরে তোমার পালা’ এই model করে তারপর choice দেখান।",
+    success: "অপেক্ষা করলে পালা করে খেলা যায়।",
+  },
 };
 
-function placeFirst(activities, activity) {
-  const withoutDuplicate = activities.filter((item) => item[1] !== activity[1]);
-  return [activity, ...withoutDuplicate];
-}
-
-function buildDailyPlan(mode, answers, mood) {
-  const challenges = answers.challenges || [];
-  let activities = [...mode.activities];
-  const reasons = [];
-  let focus = mode.focus;
-  let hero = mode.hero;
-  let planLabel = `${mode.label} · ${mode.age}`;
-  const profile = [];
-
-  if (answers.speech !== "yes" || challenges.includes("Speech")) {
-    activities = placeFirst(activities, supportActivities.aac);
-    focus = "ছবিতে tap করে প্রয়োজন বলো";
-    hero = "▣";
-    reasons.push("Speech support আগে");
-    profile.push("Speech support");
-  }
-
-  if (challenges.includes("Social")) {
-    activities = placeFirst(placeFirst(activities, supportActivities.story), supportActivities.emotion);
-    focus = "মুখ দেখে অনুভূতি চেনো";
-    hero = "☺";
-    reasons.push("Social practice আগে");
-    profile.push("Social focus");
-  }
-
-  if (challenges.includes("Sensory") || answers.level === "Level 3" || mood === "মন খারাপ") {
-    activities = placeFirst(activities, supportActivities.calm);
-    focus = "আগে একটু শান্ত হই";
-    hero = "☁";
-    reasons.push("Sensory calm আগে");
-    profile.push("Sensory safe");
-  }
-
-  if (answers.age === "1-3" || mode.label === "অনুভব") {
-    activities = placeFirst(activities, supportActivities.bubble);
-    if (!challenges.includes("Speech") && mood !== "মন খারাপ") {
-      focus = "বুদবুদ ধরো";
-      hero = "🫧";
-    }
-  }
-
-  if (mood === "মাঝামাঝি") {
-    reasons.push("আজ familiar সহজ activity");
-  }
-
-  if (mood === "ভালো আছি") {
-    reasons.push("নতুন challenge ধীরে");
-  }
-
-  if (answers.level === "Level 2") {
-    reasons.push("মাঝারি সহায়তা mode");
-    activities = [...activities.slice(0, 4), ...activities.slice(4)];
-    profile.push("Level 2");
-  }
-
-  if (answers.level === "Level 3") {
-    activities = placeFirst(placeFirst(activities, supportActivities.calm), supportActivities.bubble);
-    reasons.push("লো-প্রেশার plan");
-    profile.push("Level 3");
-  }
-
-  if (answers.play === "caregiver") {
-    activities = placeFirst(activities, supportActivities.caregiver);
-    reasons.push("Caregiver guided");
-    profile.push("Caregiver mode");
-  }
-
-  if (answers.therapy === "yes") {
-    reasons.push("থেরাপি history consider");
-    profile.push("Therapy history");
-  }
-
-  return {
-    ...mode,
-    activities,
-    focus,
-    hero,
-    planLabel,
-    reason: reasons.slice(0, 2).join(" · ") || "আজকের plan প্রস্তুত",
-    profileText: profile.slice(0, 3).join(" · "),
-  };
-}
-
-function loadInitialState() {
+function loadSavedState() {
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey));
     if (!saved) return null;
-    return {
-      ...saved,
-      progress: {
-        ...defaultProgress,
-        ...(saved.progress || {}),
-        moodHistory: Array.isArray(saved.progress?.moodHistory) ? saved.progress.moodHistory : [],
-        modules: saved.progress?.modules || {},
-        weakAreas: saved.progress?.weakAreas || {},
-      },
-    };
+    return saved;
   } catch {
     return null;
   }
 }
 
+function getMoodMeta(moodId) {
+  return moodOptions.find((item) => item.id === moodId) || moodOptions[1];
+}
+
+function pickDifficulty(moodId) {
+  if (moodId === "sad") return "easy";
+  if (moodId === "good") return "broad";
+  return "medium";
+}
+
+function buildDailyPlan(setup, moodId) {
+  const difficulty = pickDifficulty(moodId);
+  const games = {
+    request: {
+      id: "request",
+      title: "চাই বলি",
+      icon: "💬",
+      purpose: "ছবি বেছে প্রয়োজন বলা",
+      parentGuide: "শিশু card বাছলে বাক্যটি parent বলবেন এবং সম্ভব হলে বাস্তব জিনিসটি দেখাবেন।",
+      data: requestSets[difficulty],
+    },
+    emotion: {
+      id: "emotion",
+      title: "মুখ চিনো",
+      icon: "🙂",
+      purpose: "মুখ দেখে অনুভূতি চেনা",
+      parentGuide: emotionSets[difficulty].guide,
+      data: emotionSets[difficulty],
+    },
+    social: {
+      id: "social",
+      title: "কি করা ভালো",
+      icon: "🤝",
+      purpose: "সহজ social response বেছে নেওয়া",
+      parentGuide: socialSets[difficulty].guide,
+      data: socialSets[difficulty],
+    },
+  };
+
+  let order = ["request", "emotion", "social"];
+  const reasonParts = [];
+
+  if (setup.speech !== "talks") {
+    order = ["request", "emotion", "social"];
+    reasonParts.push("আজ চাওয়া-বলার practice আগে");
+  } else if (setup.focus === "emotion") {
+    order = ["emotion", "request", "social"];
+    reasonParts.push("আজ মুখ-চেনা practice আগে");
+  } else if (setup.focus === "social") {
+    order = ["social", "request", "emotion"];
+    reasonParts.push("আজ social response আগে");
+  } else {
+    reasonParts.push("আজ চাওয়া-বলার practice আগে");
+  }
+
+  if (moodId === "sad") {
+    reasonParts.push("সহজ choice আর ইঙ্গিত আগে");
+  } else if (moodId === "good") {
+    reasonParts.push("একটু বেশি choice রাখা হয়েছে");
+  } else {
+    reasonParts.push("পরিচিত ধাপে practice");
+  }
+
+  return {
+    reason: reasonParts.join(" · "),
+    caregiverNote: setup.playMode === "caregiver" ? "প্রতিটি game-এর আগে ছোট parent guide দেখা যাবে।" : "শিশু ছবি দেখে নিজেই বেছে নিতে পারবে।",
+    games: order.map((id, index) => ({
+      ...games[id],
+      order: index + 1,
+      promptLevel: setup.playMode === "caregiver" ? "guided" : "independent",
+    })),
+  };
+}
+
+function buildHomeSuggestion(sessionResults) {
+  if (!sessionResults.length) {
+    return "আজ একটি চাই-card real life-এও ব্যবহার করে দেখুন।";
+  }
+  const easiest = [...sessionResults]
+    .sort((a, b) => a.attemptCount - b.attemptCount || Number(a.hintUsed) - Number(b.hintUsed))[0];
+
+  if (easiest?.gameId === "request") {
+    return "আজ পানি বা বিরতি card real life-এও ব্যবহার করুন।";
+  }
+  if (easiest?.gameId === "emotion") {
+    return "আজ mirror বা simple face picture দিয়ে খুশি-কষ্ট practice করুন।";
+  }
+  return "আজ hello বা turn-taking real play-এ model করে দেখান।";
+}
+
+function buildSummary(sessionResults, moodId) {
+  const moodMeta = getMoodMeta(moodId);
+  const hintGames = sessionResults.filter((item) => item.hintUsed).map((item) => item.title);
+  const easiest = sessionResults.length
+    ? [...sessionResults].sort((a, b) => a.attemptCount - b.attemptCount || Number(a.hintUsed) - Number(b.hintUsed))[0]
+    : null;
+
+  return {
+    mood: moodMeta,
+    completed: sessionResults.filter((item) => item.success).length,
+    hintGames,
+    easiest,
+    suggestion: buildHomeSuggestion(sessionResults),
+  };
+}
+
 function App() {
-  const saved = loadInitialState();
-  const [screen, setScreen] = useState(saved?.screen || "welcome");
-  const [previousScreen, setPreviousScreen] = useState("welcome");
-  const [setupIndex, setSetupIndex] = useState(saved?.setupIndex || 0);
-  const [childName, setChildName] = useState(saved?.childName || "সিমা");
-  const [ageBand, setAgeBand] = useState(saved?.ageBand || "4-6");
-  const [setupAnswers, setSetupAnswers] = useState({
-    ...defaultSetupAnswers,
-    ...(saved?.setupAnswers || {}),
-    age: saved?.setupAnswers?.age || saved?.ageBand || "4-6",
-  });
-  const [mood, setMood] = useState(saved?.mood || "");
-  const [stars, setStars] = useState(saved?.stars || 5);
-  const [fontScale, setFontScale] = useState(saved?.fontScale || 1);
-  const [language, setLanguage] = useState(saved?.language || "bn");
-  const [attempts, setAttempts] = useState(saved?.attempts || 0);
-  const [hintVisible, setHintVisible] = useState(saved?.hintVisible || false);
-  const [sessionNotice, setSessionNotice] = useState(false);
-  const [selectedActivity, setSelectedActivity] = useState(saved?.selectedActivity || null);
-  const [world, setWorld] = useState(saved?.world || {
-    glow: 2,
-    fireflies: 3,
-    flowers: 1,
-    taps: 0,
-    mood: "calm",
-  });
-  const [progress, setProgress] = useState(saved?.progress || defaultProgress);
+  const saved = loadSavedState();
+  const [screen, setScreen] = useState(saved?.screen || "setup");
+  const [setup, setSetup] = useState(saved?.setup || defaultSetup);
+  const [moodId, setMoodId] = useState(saved?.moodId || "");
+  const [activeGameIndex, setActiveGameIndex] = useState(saved?.activeGameIndex || 0);
+  const [sessionResults, setSessionResults] = useState(saved?.sessionResults || []);
+  const [recentSessions, setRecentSessions] = useState(saved?.recentSessions || []);
+  const [guideOpen, setGuideOpen] = useState(false);
 
-  const mode = modes[ageBand];
-  const setup = setupSteps[setupIndex];
-  const dailyPlan = useMemo(() => buildDailyPlan(mode, setupAnswers, mood), [mode, setupAnswers, mood]);
-  const showCalm = !["welcome", "setup", "ready", "mood", "calm"].includes(screen);
+  const plan = useMemo(() => buildDailyPlan(setup, moodId || "okay"), [setup, moodId]);
+  const activeGame = plan.games[activeGameIndex] || null;
+  const summary = useMemo(() => buildSummary(sessionResults, moodId || "okay"), [sessionResults, moodId]);
 
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify({ screen, setupIndex, childName, ageBand, setupAnswers, mood, stars, fontScale, language, attempts, hintVisible, selectedActivity, world, progress }));
-  }, [screen, setupIndex, childName, ageBand, setupAnswers, mood, stars, fontScale, language, attempts, hintVisible, selectedActivity, world, progress]);
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        screen,
+        setup,
+        moodId,
+        activeGameIndex,
+        sessionResults,
+        recentSessions,
+      }),
+    );
+  }, [screen, setup, moodId, activeGameIndex, sessionResults, recentSessions]);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => setSessionNotice(true), 15000);
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  const moodCopy = useMemo(() => {
-    if (mood === "মন খারাপ") return "আজ শুধু শান্ত activity, কোনো চাপ নেই।";
-    if (mood === "মাঝামাঝি") return "আজ পরিচিত সহজ activity দিয়ে শুরু করি।";
-    return "আজ নতুন কিছু ধীরে ধীরে চেষ্টা করি।";
-  }, [mood]);
-
-  function go(next) {
-    if (screen !== "calm") setPreviousScreen(screen);
-    setScreen(next);
+  function updateSetup(field, value) {
+    setSetup((current) => ({ ...current, [field]: value }));
   }
 
-  function nextSetup() {
-    if (setupIndex < setupSteps.length - 1) setSetupIndex(setupIndex + 1);
-    else go("ready");
+  function startMood() {
+    setScreen("mood");
   }
 
-  function chooseSetupValue(value) {
-    setSetupAnswers((current) => ({
-      ...current,
-      [setup.id]: value,
-    }));
-    if (setup.id === "age") setAgeBand(value);
+  function chooseMood(nextMoodId) {
+    setMoodId(nextMoodId);
+    setSessionResults([]);
+    setActiveGameIndex(0);
+    setScreen("home");
   }
 
-  function toggleChallenge(value) {
-    setSetupAnswers((current) => {
-      const currentChallenges = current.challenges || [];
-      const exists = currentChallenges.includes(value);
-      return {
-        ...current,
-        challenges: exists ? currentChallenges.filter((item) => item !== value) : [...currentChallenges, value],
-      };
-    });
+  function openGame(index = 0) {
+    setActiveGameIndex(index);
+    setGuideOpen(false);
+    setScreen("game");
   }
 
-  function restartSetup() {
-    setSetupIndex(0);
-    setHintVisible(false);
-    setAttempts(0);
-    go("setup");
-  }
-
-  function reward(amount, next = "reward", labelOverride = "") {
-    setStars((value) => value + amount);
-    setWorld((value) => ({
-      ...value,
-      glow: Math.min(8, value.glow + 1),
-      fireflies: Math.min(10, value.fireflies + 1),
-      flowers: Math.min(7, value.flowers + 1),
-      mood: "happy",
-    }));
-    recordActivity(labelOverride || selectedActivity?.label || activityFallbacks[screen] || "Activity", amount, true);
-    setAttempts(0);
-    setHintVisible(false);
-    go(next);
-  }
-
-  function softMiss() {
-    const label = selectedActivity?.label || activityFallbacks[screen] || "ইমোশন গেম";
-    setProgress((value) => ({
-      ...value,
-      weakAreas: {
-        ...value.weakAreas,
-        [label]: (value.weakAreas?.[label] || 0) + 1,
-      },
-    }));
-    setAttempts((value) => {
-      const next = value + 1;
-      if (next >= 3) setHintVisible(true);
+  function saveGameResult(result) {
+    setSessionResults((current) => {
+      const next = [...current];
+      next[result.order - 1] = result;
       return next;
     });
-  }
-
-  function chooseMood(value) {
-    setMood(value);
-    setProgress((current) => ({
-      ...current,
-      moodHistory: [...(current.moodHistory || []).slice(-6), { mood: value, date: new Date().toISOString() }],
-    }));
-    go("home");
-  }
-
-  function openActivity(activity) {
-    const [icon, label, description] = activity;
-    setSelectedActivity({ icon, label, description, mode: dailyPlan.label });
-    if (label.includes("শান্ত")) go("calm");
-    else if (label.includes("AAC")) go("aac");
-    else if (label.includes("ইমোশন")) go("emotion");
-    else if (label.includes("স্টোরি")) go("story");
-    else if (label.includes("ট্রেসিং")) go("trace");
-    else go("activity");
-  }
-
-  function touchWorld() {
-    setWorld((value) => ({
-      ...value,
-      taps: value.taps + 1,
-      fireflies: Math.min(10, value.fireflies + (value.taps % 2 === 0 ? 1 : 0)),
-      glow: Math.min(8, value.glow + 0.2),
-      mood: value.mood === "sleepy" ? "calm" : "sleepy",
-    }));
-  }
-
-  function recordActivity(label, amount, completed) {
-    setProgress((current) => {
-      const module = current.modules?.[label] || { count: 0, stars: 0 };
-      return {
-        ...current,
-        completed: (current.completed || 0) + (completed ? 1 : 0),
-        starsEarned: (current.starsEarned || 0) + amount,
-        modules: {
-          ...current.modules,
-          [label]: {
-            count: module.count + 1,
-            stars: module.stars + amount,
-          },
+    if (result.order >= 3) {
+      setRecentSessions((current) => [
+        {
+          date: new Date().toISOString(),
+          moodId,
+          setup,
+          results: [...sessionResults.slice(0, result.order - 1), result],
         },
-      };
-    });
+        ...current,
+      ].slice(0, 10));
+      setScreen("finish");
+      return;
+    }
+    setActiveGameIndex(result.order);
+    setScreen("home");
+  }
+
+  function restartDay() {
+    setMoodId("");
+    setSessionResults([]);
+    setActiveGameIndex(0);
+    setScreen("mood");
+  }
+
+  function resetAll() {
+    localStorage.removeItem(storageKey);
+    setSetup(defaultSetup);
+    setMoodId("");
+    setActiveGameIndex(0);
+    setSessionResults([]);
+    setRecentSessions([]);
+    setGuideOpen(false);
+    setScreen("setup");
   }
 
   return (
-    <main className="app-shell" style={{ "--font-scale": fontScale }} aria-label="আভা অ্যাপ প্রোটোটাইপ">
-      <section className="phone">
-        <StatusBar />
-        {showCalm && <button className="language-chip" type="button" onClick={() => setLanguage(language === "bn" ? "en" : "bn")}>{language === "bn" ? "EN" : "বাংলা"}</button>}
-        {showCalm && <button className="cloud-button" type="button" onClick={() => go("calm")} aria-label="Calm down"><span>☁</span></button>}
-        {sessionNotice && showCalm && <div className="session-notice"><span>☁</span><p>৫ মিনিট পরে বিরতি। ধীরে শেষ করি।</p><button type="button" onClick={() => setSessionNotice(false)}>ঠিক আছে</button></div>}
+    <div className="app-shell">
+      <div className="phone">
+        <div className="status-bar">
+          <span>9:41</span>
+          <span>আভা</span>
+        </div>
 
-        {screen === "welcome" && <Welcome onStart={() => go("setup")} />}
         {screen === "setup" && (
-          <SetupScreen
+          <SetupScreen setup={setup} updateSetup={updateSetup} startMood={startMood} />
+        )}
+
+        {screen === "mood" && (
+          <MoodScreen childName={setup.childName || "তোমার শিশু"} chooseMood={chooseMood} />
+        )}
+
+        {screen === "home" && (
+          <HomeScreen
             setup={setup}
-            setupIndex={setupIndex}
-            childName={childName}
-            setChildName={setChildName}
-            ageBand={ageBand}
-            setupAnswers={setupAnswers}
-            chooseSetupValue={chooseSetupValue}
-            toggleChallenge={toggleChallenge}
-            nextSetup={nextSetup}
-            back={() => (setupIndex > 0 ? setSetupIndex(setupIndex - 1) : go("welcome"))}
+            moodId={moodId}
+            plan={plan}
+            sessionResults={sessionResults}
+            openGame={openGame}
+            openSummary={() => setScreen("summary")}
+            restartDay={restartDay}
           />
         )}
-        {screen === "ready" && <Ready childName={childName} onNext={() => go("mood")} />}
-        {screen === "mood" && <MoodScreen chooseMood={chooseMood} />}
-        {screen === "home" && <Home childName={childName} mode={dailyPlan} setupAnswers={setupAnswers} moodCopy={moodCopy} stars={stars} language={language} world={world} touchWorld={touchWorld} restartSetup={restartSetup} go={go} openActivity={openActivity} />}
-        {screen === "mode" && <ModeMenu mode={dailyPlan} setupAnswers={setupAnswers} setAgeBand={setAgeBand} ageBand={ageBand} go={go} openActivity={openActivity} />}
-        {screen === "activity" && <Activity activity={selectedActivity} mode={mode} reward={reward} go={go} />}
-        {screen === "emotion" && <Emotion reward={reward} softMiss={softMiss} hintVisible={hintVisible} attempts={attempts} go={go} />}
-        {screen === "story" && <Story reward={reward} softMiss={softMiss} hintVisible={hintVisible} go={go} />}
-        {screen === "trace" && <Trace reward={reward} go={go} />}
-        {screen === "aac" && <Aac recordActivity={recordActivity} go={go} />}
-        {screen === "calm" && <Calm close={() => setScreen(previousScreen || "home")} />}
-        {screen === "reward" && <Reward stars={stars} go={go} />}
-        {screen === "customize" && <Customize go={go} />}
-        {screen === "parent" && <ParentDashboard childName={childName} mood={mood} mode={dailyPlan} progress={progress} fontScale={fontScale} setFontScale={setFontScale} language={language} setLanguage={setLanguage} restartSetup={restartSetup} go={go} />}
-        {screen === "therapist" && <TherapistMode childName={childName} go={go} />}
-      </section>
-    </main>
+
+        {screen === "game" && activeGame && (
+          <GameScreen
+            game={activeGame}
+            moodId={moodId}
+            onComplete={saveGameResult}
+            onBack={() => setScreen("home")}
+            guideOpen={guideOpen}
+            setGuideOpen={setGuideOpen}
+          />
+        )}
+
+        {screen === "finish" && (
+          <FinishScreen
+            childName={setup.childName || "আজকের সঙ্গী"}
+            completed={summary.completed}
+            goSummary={() => setScreen("summary")}
+          />
+        )}
+
+        {screen === "summary" && (
+          <SummaryScreen
+            setup={setup}
+            summary={summary}
+            sessionResults={sessionResults}
+            restartDay={restartDay}
+            resetAll={resetAll}
+            goHome={() => setScreen("home")}
+          />
+        )}
+      </div>
+    </div>
   );
 }
 
-function Screen({ children }) {
-  return <div className="screen active">{children}</div>;
-}
+function SetupScreen({ setup, updateSetup, startMood }) {
+  const ready = setup.childName.trim().length > 0;
 
-function StatusBar() {
-  return <div className="status-bar" aria-hidden="true"><span>9:41</span><span>●●● Wi-Fi ▰</span></div>;
-}
-
-function Welcome({ onStart }) {
   return (
     <Screen>
-      <div className="stars" />
-      <div className="welcome-center">
-        <p className="eyebrow">নিরাপদ ডিজিটাল জগত</p>
-        <h1>আভা</h1>
-        <p className="subtitle">(Aava)</p>
-        <div className="sleep-cloud" aria-hidden="true">☁</div>
-        <p className="welcome-copy">শান্ত, সহজ, শিশুবান্ধব শেখার সঙ্গী</p>
+      <div className="screen-head">
+        <p className="eyebrow">৪-৬ বছর · ছবি-ভিত্তিক</p>
+        <h1 className="brand-title">আভা</h1>
+        <p className="subtitle">শান্ত, সহজ, ছবি দিয়ে বোঝা যায় এমন ৩টা ছোট শেখার game।</p>
       </div>
-      <button className="primary-button" type="button" onClick={onStart}>শুরু করুন</button>
+
+      <label className="field-label" htmlFor="childName">শিশুর নাম</label>
+      <input
+        id="childName"
+        className="text-input"
+        value={setup.childName}
+        onChange={(event) => updateSetup("childName", event.target.value)}
+        placeholder="নাম লিখুন"
+      />
+
+      <div className="compact-note">এই version শুধু ৪-৬ বছরের জন্য</div>
+
+      <QuestionBlock title="কথা বলা">
+        <ChoiceRow
+          selected={setup.speech}
+          onSelect={(value) => updateSetup("speech", value)}
+          options={[
+            { id: "talks", title: "কথা বলে", text: "ছোট শব্দ বা সহজ বাক্য" },
+            { id: "some", title: "কিছু শব্দ", text: "ছবি সহায়তা ভালো কাজ করে" },
+            { id: "not-yet", title: "এখনও না", text: "AAC আগে দরকার" },
+          ]}
+        />
+      </QuestionBlock>
+
+      <QuestionBlock title="আজ কোন practice বেশি দরকার?">
+        <ChoiceRow
+          selected={setup.focus}
+          onSelect={(value) => updateSetup("focus", value)}
+          options={[
+            { id: "communication", title: "চাই বলা", text: "request আর AAC" },
+            { id: "emotion", title: "মুখ চেনা", text: "emotion matching" },
+            { id: "social", title: "social response", text: "hello, help, turn" },
+          ]}
+        />
+      </QuestionBlock>
+
+      <QuestionBlock title="আজ কে পাশে থাকবে?">
+        <ChoiceRow
+          selected={setup.playMode}
+          onSelect={(value) => updateSetup("playMode", value)}
+          options={[
+            { id: "caregiver", title: "caregiver সাথে", text: "guide দেখা যাবে" },
+            { id: "alone", title: "শিশু নিজে", text: "ছবি বেছে খেলবে" },
+          ]}
+        />
+      </QuestionBlock>
+
+      <button className="primary-button bottom" type="button" onClick={startMood} disabled={!ready}>
+        mood check-in এ যাই
+      </button>
     </Screen>
   );
 }
 
-function SetupScreen({ setup, setupIndex, childName, setChildName, ageBand, setupAnswers, chooseSetupValue, toggleChallenge, nextSetup, back }) {
-  const selectedValue = setup.id === "age" ? ageBand : setupAnswers[setup.id];
-  const selectedChallenges = setupAnswers.challenges || [];
+function QuestionBlock({ title, children }) {
+  return (
+    <section className="question-block">
+      <h3>{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function ChoiceRow({ options, selected, onSelect }) {
+  return (
+    <div className="choice-list">
+      {options.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          className={`choice-panel ${selected === option.id ? "selected" : ""}`}
+          onClick={() => onSelect(option.id)}
+          aria-pressed={selected === option.id}
+        >
+          <strong>{option.title}</strong>
+          <span>{option.text}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function MoodScreen({ childName, chooseMood }) {
   return (
     <Screen>
-      <button className="ghost-back" type="button" onClick={back}>‹</button>
-      <div className="progress-dots" aria-hidden="true">{[0, 1, 2].map((dot) => <span key={dot} className={dot <= Math.min(setupIndex, 2) ? "filled" : ""} />)}</div>
-      <div className={`screen-head ${setup.icon ? "centered" : ""}`}>
-        {setup.eyebrow && <p className="eyebrow">{setup.eyebrow}</p>}
-        {setup.icon && <div className="big-bubble">{setup.icon}</div>}
-        <h2>{setup.title}</h2>
-        {setup.text && <p>{setup.text}</p>}
+      <div className="screen-head centered mood-head">
+        <h2>আজ {childName} কেমন আছে?</h2>
+        <p>একটা মুখ বেছে নাও</p>
       </div>
-      {setup.id === "name" && <><label className="field-label" htmlFor="childName">নাম</label><input id="childName" className="text-input" value={childName} onChange={(event) => setChildName(event.target.value)} /></>}
-      {setup.options && <div className={setup.id === "play" ? "choice-stack" : "two-actions setup-options"}>{setup.options.map(([value, icon, label, meta]) => <button className={`${setup.id === "play" ? "wide-illustration" : "choice-card"} ${selectedValue === value ? "selected" : ""}`} type="button" key={label} onClick={() => chooseSetupValue(value)} aria-pressed={selectedValue === value}>{icon && <span className="choice-icon">{icon}</span>}<strong>{label}</strong>{meta && <small>{meta}</small>}</button>)}</div>}
-      {setup.rows && <div className="choice-stack compact">{setup.rows.map(([value, icon, label, meta]) => <button className={`choice-row ${selectedValue === value ? "selected" : ""}`} type="button" key={value} onClick={() => chooseSetupValue(value)} aria-pressed={selectedValue === value}><span>{icon}</span><strong>{label}</strong>{meta && <small>{meta}</small>}</button>)}</div>}
-      {setup.checks && <div className="check-list">{setup.checks.map(([value, label]) => <label key={value}><span>{label}</span><input type="checkbox" checked={selectedChallenges.includes(value)} onChange={() => toggleChallenge(value)} /></label>)}</div>}
-      <button className="primary-button bottom" type="button" onClick={nextSetup}>পরবর্তী</button>
+      <div className="mood-column">
+        {moodOptions.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            className={`mood-face ${option.id}`}
+            onClick={() => chooseMood(option.id)}
+          >
+            <span>{option.emoji}</span>
+            <strong>{option.label}</strong>
+          </button>
+        ))}
+      </div>
     </Screen>
   );
 }
 
-function Ready({ childName, onNext }) {
-  return <Screen><div className="celebrate"><div className="child-character" aria-hidden="true">👧</div><h2>আভা প্রস্তুত!</h2><p>আজকে {childName || "সিমা"} এর জন্য আমরা এখান থেকে শুরু করছি।</p></div><button className="primary-button bottom" type="button" onClick={onNext}>চলুন শুরু করি</button></Screen>;
-}
+function HomeScreen({ setup, moodId, plan, sessionResults, openGame, openSummary, restartDay }) {
+  const moodMeta = getMoodMeta(moodId);
+  const nextIndex = sessionResults.length;
+  const nextGame = plan.games[nextIndex] || null;
 
-function MoodScreen({ chooseMood }) {
-  const moods = [["happy", "😊", "ভালো আছি"], ["neutral", "😐", "মাঝামাঝি"], ["sad", "😔", "মন খারাপ"]];
-  return <Screen><div className="screen-head centered mood-head"><h2>আজ তুমি কেমন অনুভব করছো?</h2><p>তোমার অনুভূতি জানলে আভা কোমলভাবে দিন সাজাবে।</p></div><div className="mood-column">{moods.map(([kind, face, label]) => <button className={`mood-face ${kind}`} type="button" key={label} onClick={() => chooseMood(label)}><span>{face}</span><strong>{label}</strong></button>)}</div></Screen>;
-}
-
-function Home({ childName, mode, setupAnswers, moodCopy, stars, language, world, touchWorld, restartSetup, go, openActivity }) {
-  const fireflies = Array.from({ length: Math.min(10, Math.floor(world.fireflies)) });
-  const flowers = Array.from({ length: Math.min(7, Math.floor(world.flowers)) });
   return (
     <Screen>
-      <div className="home-top world-top"><div><p className="eyebrow">আভার শান্ত জগৎ</p><h2>হ্যালো, {childName || "সিমা"}!</h2></div><div className="star-pill">★ {stars}</div></div>
-      <button className={`calm-world ${world.mood}`} type="button" onClick={touchWorld} aria-label="আভার জগৎ ছুঁয়ে দেখো">
-        <div className="world-sky" style={{ "--world-glow": world.glow }}>
-          {fireflies.map((_, index) => <span className={`firefly firefly-${(index % 6) + 1}`} key={index}>✦</span>)}
-          <div className="moon-glow">☾</div>
-          <div className="aava-companion">
-            <span className="cloud-face">{world.mood === "happy" ? "😊" : world.mood === "sleepy" ? "😌" : "🙂"}</span>
-            <small>আভা</small>
+      <div className="home-top">
+        <div>
+          <p className="eyebrow">{moodMeta.label}</p>
+          <h2>{setup.childName || "আজকের plan"}</h2>
+          <p className="subtitle">{plan.reason}</p>
+        </div>
+        <button className="small-chip" type="button" onClick={restartDay}>Mood</button>
+      </div>
+
+      <div className="care-strip">
+        <strong>{plan.games[0].title} আগে</strong>
+        <span>{plan.caregiverNote}</span>
+      </div>
+
+      <div className="today-pack">
+        <p className="pack-label">আজকের ৩টা game</p>
+        <div className="pack-row">
+          {plan.games.map((game, index) => {
+            const done = Boolean(sessionResults[index]?.success);
+            const current = nextIndex === index;
+            return (
+              <button
+                key={game.id}
+                type="button"
+                className={`pack-chip ${done ? "done" : ""} ${current ? "current" : ""}`}
+                onClick={() => openGame(index)}
+              >
+                <span>{game.icon}</span>
+                <strong>{game.title}</strong>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {nextGame ? (
+        <button className="hero-card" type="button" onClick={() => openGame(nextIndex)}>
+          <div className="hero-icon">{nextGame.icon}</div>
+          <div>
+            <strong>{nextGame.title}</strong>
+            <span>{nextGame.purpose}</span>
           </div>
-          <div className="world-ground">
-            {flowers.map((_, index) => <span key={index}>✿</span>)}
+        </button>
+      ) : (
+        <div className="hero-card finished" role="status">
+          <div className="hero-icon">⭐</div>
+          <div>
+            <strong>আজকের ৩টা game শেষ</strong>
+            <span>Parent summary দেখো</span>
           </div>
         </div>
-      </button>
-      <div className="world-prompt">{world.taps === 0 ? "আভাকে আলতো করে ছুঁয়ে দেখো" : world.mood === "happy" ? "আভা খুশি হয়েছে" : "জোনাকি জ্বলছে"}</div>
-      <div className="plan-summary">
-        <strong>{mode.reason}</strong>
-        <span>{mode.profileText || `Level: ${setupAnswers.level}`}</span>
+      )}
+
+      <div className="home-actions bottom-stack">
+        <button className="primary-button" type="button" onClick={() => (nextGame ? openGame(nextIndex) : openSummary())}>
+          {nextGame ? "এখন শুরু করি" : "summary দেখি"}
+        </button>
+        <button className="secondary-button" type="button" onClick={openSummary}>
+          parent summary
+        </button>
       </div>
-      <div className="offline-strip"><span>●</span>{language === "bn" ? "Offline ready" : "Offline ready"}<button type="button" onClick={restartSetup}>Setup</button></div>
-      <div className="path-panel world-activities"><div className="mode-kicker"><span>{mode.planLabel}</span><small>{mode.reason}</small></div><div className="path-line">{mode.activities.slice(0, 3).map((activity) => <button type="button" key={activity[1]} onClick={() => openActivity(activity)}>{activity[0]} {activity[1]}</button>)}</div></div>
-      <div className="gentle-start"><button type="button" onClick={() => openActivity(mode.activities[0])}>{mode.hero} শুরু</button><button type="button" onClick={() => go("mode")}>সব খেলা</button></div>
-      <TabBar active="home" go={go} />
     </Screen>
   );
 }
 
-function ModeMenu({ mode, setupAnswers, setAgeBand, ageBand, go, openActivity }) {
+function GameScreen({ game, moodId, onComplete, onBack, guideOpen, setGuideOpen }) {
   return (
     <Screen>
-      <button className="ghost-back" type="button" onClick={() => go("home")}>‹</button>
-      <div className="screen-head"><p className="eyebrow">{mode.label} · {mode.age}</p><h2>আজকের মেনু</h2><p>{mode.guide}</p><small className="mode-profile">Profile: {setupAnswers.level}, speech: {setupAnswers.speech}, play: {setupAnswers.play}</small></div>
-      <div className="mode-switch">{Object.entries(modes).map(([key, item]) => <button className={ageBand === key ? "active" : ""} type="button" key={key} onClick={() => setAgeBand(key)}>{item.label}</button>)}</div>
-      <div className="module-grid">{mode.activities.map((activity) => <button type="button" key={activity[1]} onClick={() => openActivity(activity)}><span>{activity[0]}</span>{activity[1]}</button>)}</div>
-      <button className="secondary-button bottom" type="button" onClick={() => go("home")}>হোমে ফিরুন</button>
-    </Screen>
-  );
-}
-
-function Activity({ activity, mode, reward, go }) {
-  const current = activity || { icon: mode.hero, label: mode.focus, description: mode.guide };
-  if (current.label.includes("বুদবুদ")) return <BubbleActivity activity={current} reward={reward} go={go} />;
-  if (current.label.includes("রঙ")) return <ColorActivity activity={current} reward={reward} go={go} />;
-  if (current.label.includes("মেমরি")) return <MemoryActivity activity={current} reward={reward} go={go} />;
-  if (current.label.includes("Routine")) return <RoutineActivity activity={current} reward={reward} go={go} />;
-  if (current.label.includes("Dressing")) return <ChoiceActivity activity={current} question="বৃষ্টি হলে কী পরবে?" options={["টি-শার্ট", "রেইনকোট", "স্যান্ডেল"]} correct="রেইনকোট" reward={reward} go={go} />;
-  if (current.label.includes("Food")) return <ChoiceActivity activity={current} question="কোনটি healthy?" options={["চিপস", "আপেল", "সফট ড্রিংক"]} correct="আপেল" reward={reward} go={go} />;
-  if (current.label.includes("Safety")) return <ChoiceActivity activity={current} question="রাস্তা পার হওয়ার আগে কী করবে?" options={["দৌড়াই", "দুই পাশে দেখি", "চোখ বন্ধ করি"]} correct="দুই পাশে দেখি" reward={reward} go={go} />;
-  return <ActivityShell title={current.label} subtitle={current.description || mode.guide} back={() => go("home")}><div className="story-scene mode-scene"><span>{current.icon || mode.hero}</span></div><button className="primary-button bottom" type="button" onClick={() => reward(3)}>শেষ করেছি</button></ActivityShell>;
-}
-
-function BubbleActivity({ activity, reward, go }) {
-  const [popped, setPopped] = useState([]);
-  const bubbles = ["b1", "b2", "b3", "b4", "b5"];
-  const complete = popped.length >= bubbles.length;
-  return (
-    <ActivityShell title={activity.label} subtitle={activity.description} guide="শিশুকে বলুন: ‘একটা bubble ধরো’। হাত ধরে না টেনে, শুধু screen-এর দিকে আলতো ইঙ্গিত করুন। সব bubble শেষ হলে শান্তভাবে বলুন ‘শেষ’।" back={() => go("home")}>
-      <div className="bubble-play">
-        {bubbles.map((id, index) => <button className={`bubble bubble-${index + 1} ${popped.includes(id) ? "popped" : ""}`} type="button" key={id} onClick={() => setPopped((items) => items.includes(id) ? items : [...items, id])}>🫧</button>)}
+      <button className="ghost-back" type="button" onClick={onBack}>‹</button>
+      <div className="screen-head centered activity-head">
+          <p className="eyebrow">খেলা {game.order} / ৩</p>
+          <h2>{game.title}</h2>
+          <p>{game.purpose}</p>
+          <button className="parent-guide-trigger" type="button" onClick={() => setGuideOpen(true)}>
+            Parent guide
+        </button>
       </div>
-      <div className="activity-meter">{popped.length}/{bubbles.length} bubble</div>
-      <button className="primary-button bottom" type="button" disabled={!complete} onClick={() => reward(5)}>{complete ? "দারুণ, শেষ" : "সব bubble ধরো"}</button>
-    </ActivityShell>
-  );
-}
 
-function ColorActivity({ activity, reward, go }) {
-  const [chosen, setChosen] = useState("");
-  const colors = [["লাল", "#d98a9a"], ["নীল", "#8ea9c8"], ["হলুদ", "#ffd36f"]];
-  return (
-    <ActivityShell title={activity.label} subtitle={activity.description} guide="একবারে একটি রং বলুন। যেমন ‘লাল কোথায়?’ শিশু tap করলে রংটির নাম ধীরে repeat করুন। ভুল tap করলে কিছু বলার দরকার নেই, আবার রং দেখান।" back={() => go("home")}>
-      <div className="color-touch">{colors.map(([label, color]) => <button className={chosen === label ? "selected" : ""} style={{ background: color }} type="button" key={label} onClick={() => setChosen(label)}><span>{label}</span></button>)}</div>
-      <div className="speech-output">{chosen ? `${chosen} রং` : "একটি রং ছুঁয়ে দেখো"}</div>
-      <button className="primary-button bottom" type="button" disabled={!chosen} onClick={() => reward(3)}>শেষ করেছি</button>
-    </ActivityShell>
-  );
-}
+      {game.id === "request" && <RequestBuilderGame game={game} moodId={moodId} onComplete={onComplete} />}
+      {game.id === "emotion" && <EmotionMatchGame game={game} moodId={moodId} onComplete={onComplete} />}
+      {game.id === "social" && <SocialResponseGame game={game} moodId={moodId} onComplete={onComplete} />}
 
-function MemoryActivity({ activity, reward, go }) {
-  const cards = ["😊", "☁", "😊", "☁"];
-  const [open, setOpen] = useState([]);
-  const [matched, setMatched] = useState([]);
-  function pick(index) {
-    if (open.includes(index) || matched.includes(index)) return;
-    const next = [...open, index].slice(-2);
-    setOpen(next);
-    if (next.length === 2 && cards[next[0]] === cards[next[1]]) setMatched((items) => [...items, ...next]);
-    if (next.length === 2 && cards[next[0]] !== cards[next[1]]) window.setTimeout(() => setOpen([]), 450);
-  }
-  return (
-    <ActivityShell title={activity.label} subtitle={activity.description} guide="শিশুকে বলুন দুইটি card খুলে দেখতে। মিল হলে ‘একই’ বলুন, না মিললে কোনো negative শব্দ নয়। চাইলে parent আগে এক pair দেখিয়ে model করতে পারেন।" back={() => go("home")}>
-      <div className="memory-grid">{cards.map((card, index) => <button type="button" key={`${card}-${index}`} onClick={() => pick(index)}>{open.includes(index) || matched.includes(index) ? card : "✦"}</button>)}</div>
-      <div className="activity-meter">{matched.length / 2}/2 pair</div>
-      <button className="primary-button bottom" type="button" disabled={matched.length < cards.length} onClick={() => reward(5)}>শেষ করেছি</button>
-    </ActivityShell>
-  );
-}
-
-function RoutineActivity({ activity, reward, go }) {
-  const steps = ["ব্রাশ", "গোসল", "নাস্তা"];
-  const [done, setDone] = useState([]);
-  return (
-    <ActivityShell title={activity.label} subtitle={activity.description} guide="বাসার real routine-এর সাথে মিলিয়ে বলুন: ‘আগে ব্রাশ, তারপর গোসল, তারপর নাস্তা’। প্রতিটি step শেষে child-এর real-life কাজের ছবি দেখালে আরও ভালো।" back={() => go("home")}>
-      <div className="routine-track">{steps.map((step, index) => <button className={done.includes(step) ? "done" : ""} type="button" key={step} onClick={() => done.length === index && setDone([...done, step])}><span>{index + 1}</span>{step}</button>)}</div>
-      <div className="activity-meter">{done.length}/3 step</div>
-      <button className="primary-button bottom" type="button" disabled={done.length < 3} onClick={() => reward(5)}>রুটিন শেষ</button>
-    </ActivityShell>
-  );
-}
-
-function ChoiceActivity({ activity, question, options, correct, reward, go }) {
-  const [picked, setPicked] = useState("");
-  return (
-    <ActivityShell title={activity.label} subtitle={activity.description} guide="প্রশ্নটি ধীরে পড়ুন, তারপর প্রতিটি option দেখিয়ে নাম বলুন। শিশুকে সময় দিন। ভুল হলে ‘না’ বলবেন না, শুধু প্রশ্নটি আবার সহজ করে বলুন।" back={() => go("home")}>
-      <div className="choice-question"><span>{activity.icon}</span><h3>{question}</h3></div>
-      <div className="story-options">{options.map((option) => <button type="button" key={option} onClick={() => setPicked(option)}>{option}</button>)}</div>
-      {picked && <div className="helper-hint">{picked === correct ? "ঠিক হয়েছে। খুব ভালো!" : "আবার ধীরে ভাবি।"}</div>}
-      <button className="primary-button bottom" type="button" disabled={picked !== correct} onClick={() => reward(5)}>শেষ করেছি</button>
-    </ActivityShell>
-  );
-}
-
-function Emotion({ reward, softMiss, hintVisible, attempts, go }) {
-  return (
-    <ActivityShell title="ইমোশন গেম" subtitle="কোন মুখটি খুশি?" guide="মুখের পুরো detail explain করবেন না। শুধু চোখ আর হাসির দিকে ইঙ্গিত করুন। বলুন: ‘হাসি আছে, তাই খুশি’। real human face ব্যবহার না করাই ভালো।" back={() => go("home")}>
-      <div className="portrait-card"><div className="simple-face">😊</div></div>
-      {hintVisible && <div className="helper-hint">চোখ আর হাসিটা দেখো। যে মুখে নরম হাসি আছে সেটাই খুশি।</div>}
-      <div className="emotion-options">
-        <button type="button" onClick={() => reward(5)}>🙂</button>
-        <button type="button" onClick={softMiss}>😔</button>
-        <button type="button" onClick={softMiss}>😨</button>
-        <button type="button" onClick={softMiss}>😮</button>
-      </div>
-      <div className="mini-reward">{attempts >= 3 ? "Hint চালু হয়েছে" : "★ +5"}</div>
-    </ActivityShell>
-  );
-}
-
-function Story({ reward, softMiss, hintVisible, go }) {
-  return (
-    <ActivityShell title="সোশ্যাল স্টোরি" subtitle="কাউকে দেখলে হ্যালো বলতে হয়" guide="প্রথমে scene দেখান, তারপর নিজে model করুন: হাত নেড়ে ‘হ্যালো’। শিশুকে repeat করতে চাপ দেবেন না; শুধু option বেছে নিতে বলুন।" back={() => go("home")}>
-      <div className="story-scene"><span>👦</span><span>👋</span><span>👧</span></div>
-      <p className="story-copy">রুহান আরিফকে দেখে, হাসিমুখে হ্যালো বললে সবাই খুশি হয়।</p>
-      {hintVisible && <div className="helper-hint">নরমভাবে হাত নেড়ে “হ্যালো” বলা যায়।</div>}
-      <div className="story-options">
-        <button type="button" onClick={softMiss}>চুপ থাকি</button>
-        <button type="button" onClick={() => reward(3)}>হ্যালো বলি</button>
-        <button type="button" onClick={softMiss}>দূরে যাই</button>
-      </div>
-    </ActivityShell>
-  );
-}
-
-function Trace({ reward, go }) {
-  return <ActivityShell title="জাদুকরী আঙুল" subtitle="অক্ষর ছুঁয়ে ধীরে ধীরে আঁকো" guide="শিশুর আঙুল ধরে টানবেন না। আগে parent নিজে বাতাসে ‘অ’ আঁকুন, তারপর child-কে screen-এ চেষ্টা করতে দিন। perfect tracing দরকার নেই।" back={() => go("home")}><div className="trace-board"><span>অ</span><div className="trace-glow" /></div><button className="primary-button bottom" type="button" onClick={() => reward(4)}>শেষ করেছি</button></ActivityShell>;
-}
-
-function Aac({ recordActivity, go }) {
-  const [phrase, setPhrase] = useState("ছবিতে tap করলে বাক্য এখানে দেখা যাবে।");
-  return (
-    <ActivityShell title="AAC বোর্ড" subtitle="ছবিতে tap করে প্রয়োজন বলা যাবে।" guide="শিশু card tap করলে বাক্যটি parent উচ্চারণ করুন। যেমন ‘আমি পানি চাই’। এরপর সম্ভব হলে real পানি দিন, যাতে symbol আর বাস্তব প্রয়োজনের connection তৈরি হয়।" back={() => go("mode")}>
-      <div className="speech-output">{phrase}</div>
-      <div className="aac-grid">{aacItems.map(([icon, label]) => <button type="button" key={label} onClick={() => { setPhrase(label); recordActivity("AAC বোর্ড", 0, false); }}>{icon}<span>{label}</span></button>)}</div>
-    </ActivityShell>
-  );
-}
-
-function Calm({ close }) {
-  return <Screen><button className="ghost-back close" type="button" onClick={close}>×</button><div className="rain-lines" aria-hidden="true" /><div className="calm-content"><h2>চল, একটু শান্ত হই</h2><p>শ্বাস নাও... ধীরে ছাড়ো...</p><div className="breathing-balloon" /><div className="timer">04:59</div><div className="sound-row"><button>🌧 বৃষ্টি</button><button>〰 বাতাস</button><button>♫ সুর</button></div></div></Screen>;
-}
-
-function Reward({ stars, go }) {
-  return <Screen><div className="reward-center"><h2>দারুণ হয়েছে!</h2><p>তুমি star পেয়েছো</p><div className="giant-star">★</div><strong>+10</strong><div className="total-star">মোট star {stars + 31}</div></div><div className="two-actions bottom-row"><button className="primary-button" type="button" onClick={() => go("customize")}>চরিত্র সাজাও</button><button className="home-icon" type="button" onClick={() => go("home")}>⌂</button></div></Screen>;
-}
-
-function Customize({ go }) {
-  return <Screen><button className="ghost-back" type="button" onClick={() => go("reward")}>‹</button><div className="screen-head centered"><h2>তোমার চরিত্র সাজাও</h2></div><div className="avatar-preview">👦</div><div className="custom-tabs"><button className="active">চুল</button><button>পোশাক</button><button>ব্যাকগ্রাউন্ড</button></div><div className="closet-row"><button>👕</button><button>👚</button><button>🧥</button><button>🎒</button></div><button className="primary-button bottom" type="button" onClick={() => go("home")}>সংরক্ষণ</button></Screen>;
-}
-
-function ActivityShell({ title, subtitle, guide, back, children }) {
-  const [guideOpen, setGuideOpen] = useState(false);
-  return (
-    <Screen>
-      <button className="ghost-back" type="button" onClick={back}>‹</button>
-      <div className="screen-head centered">
-        <h2>{title}</h2>
-        <p>{subtitle}</p>
-        {guide && <button className="parent-guide-trigger" type="button" onClick={() => setGuideOpen(true)}>Parent guide</button>}
-      </div>
-      {children}
       {guideOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Parent guide">
           <div className="parent-guide-modal">
             <div className="modal-cloud">☁</div>
             <h3>Parent guide</h3>
-            <p>{guide}</p>
-            <button className="primary-button" type="button" onClick={() => setGuideOpen(false)}>বুঝেছি</button>
+            <p>{game.parentGuide}</p>
+            <button className="primary-button" type="button" onClick={() => setGuideOpen(false)}>
+              বুঝেছি
+            </button>
           </div>
         </div>
       )}
@@ -735,33 +618,313 @@ function ActivityShell({ title, subtitle, guide, back, children }) {
   );
 }
 
-function TabBar({ active, go }) {
-  const tabs = [["home", "⌂", "হোম"], ["mode", "▦", "মোড"], ["reward", "★", "রিওয়ার্ড"], ["parent", "▤", "প্যারেন্ট"]];
-  return <nav className="tabbar" aria-label="প্রধান নেভিগেশন">{tabs.map(([id, icon, label]) => <button className={active === id ? "active" : ""} type="button" key={id} onClick={() => go(id)}>{icon}<span>{label}</span></button>)}</nav>;
+function RequestBuilderGame({ game, moodId, onComplete }) {
+  const needsMatch = moodId !== "sad";
+  const [selected, setSelected] = useState(null);
+  const [matchChoice, setMatchChoice] = useState("");
+  const [attemptCount, setAttemptCount] = useState(0);
+  const [hintUsed, setHintUsed] = useState(false);
+
+  const cards = game.data;
+  const hintThreshold = moodId === "sad" ? 1 : 2;
+
+  function selectCard(card) {
+    setSelected(card);
+    setAttemptCount((value) => value + 1);
+  }
+
+  function chooseMatch(optionId) {
+    const nextAttempts = attemptCount + 1;
+    setMatchChoice(optionId);
+    setAttemptCount(nextAttempts);
+    if (optionId !== selected.id && nextAttempts >= hintThreshold) {
+      setHintUsed(true);
+    }
+  }
+
+  const done = selected && (!needsMatch || matchChoice === selected.id);
+  const promptLevel = hintUsed ? "prompted" : game.promptLevel;
+
+  return (
+    <div className="game-body">
+      {!selected && (
+        <>
+          <div className="prompt-card">
+            <div className="prompt-emoji">💬</div>
+            <strong>কি চাই?</strong>
+            <span>একটা ছবি বেছে নাও</span>
+          </div>
+          <div className="picture-grid">
+            {cards.map((card) => (
+              <button key={card.id} type="button" className="picture-choice" onClick={() => selectCard(card)}>
+                <div className="picture-icon">{card.icon}</div>
+                <strong>{card.label}</strong>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {selected && (
+        <>
+          <div className="sentence-strip">{selected.sentence}</div>
+          {needsMatch ? (
+            <>
+              <div className="prompt-card small">
+                <strong>কোন জিনিসটা মিলে?</strong>
+                <span>একটা বেছে নাও</span>
+              </div>
+              <div className="picture-grid two">
+                {selected.match.map((itemId) => {
+                  const item = requestObjects[itemId];
+                  return (
+                    <button
+                      key={itemId}
+                      type="button"
+                      className={`picture-choice ${matchChoice === itemId ? "selected" : ""}`}
+                      onClick={() => chooseMatch(itemId)}
+                    >
+                      <div className="picture-icon">{item.icon}</div>
+                      <strong>{item.label}</strong>
+                    </button>
+                  );
+                })}
+              </div>
+              {matchChoice && matchChoice !== selected.id && (
+                <div className="hint-box">{requestGuides[selected.id]}</div>
+              )}
+            </>
+          ) : (
+            <div className="hint-box success-tone">আজ শুধু picture দিয়ে request বলাই যথেষ্ট।</div>
+          )}
+        </>
+      )}
+
+      <button
+        className="primary-button bottom"
+        type="button"
+        disabled={!done}
+        onClick={() =>
+          onComplete({
+            order: game.order,
+            gameId: game.id,
+            title: game.title,
+            attemptCount,
+            hintUsed,
+            promptLevel,
+            selectedAnswer: selected?.id || "",
+            success: true,
+          })
+        }
+      >
+        শেষ করেছি
+      </button>
+    </div>
+  );
 }
 
-function ParentDashboard({ childName, mood, mode, progress, fontScale, setFontScale, language, setLanguage, restartSetup, go }) {
-  const moduleEntries = Object.entries(progress.modules || {}).slice(-4);
-  const weakEntries = Object.entries(progress.weakAreas || {}).sort((a, b) => b[1] - a[1]).slice(0, 2);
-  const recentMoods = (progress.moodHistory || []).slice(-4);
+function EmotionMatchGame({ game, moodId, onComplete }) {
+  const hintThreshold = moodId === "sad" ? 1 : 2;
+  const [picked, setPicked] = useState("");
+  const [attemptCount, setAttemptCount] = useState(0);
+  const [hintUsed, setHintUsed] = useState(false);
+
+  function choose(optionId) {
+    const nextAttempts = attemptCount + 1;
+    setPicked(optionId);
+    setAttemptCount(nextAttempts);
+    if (optionId !== game.data.correct && nextAttempts >= hintThreshold) {
+      setHintUsed(true);
+    }
+  }
+
+  const success = picked === game.data.correct;
+
+  return (
+    <div className="game-body">
+      <div className="illustration-card">
+        <div className="big-face">{game.data.scene}</div>
+        <strong>{game.data.sceneLabel}</strong>
+      </div>
+
+      {hintUsed && <div className="hint-box">{game.data.hint}</div>}
+
+      <div className={`picture-grid ${game.data.choices.length === 2 ? "two" : "three"}`}>
+        {game.data.choices.map((choice) => (
+          <button
+            key={choice.id}
+            type="button"
+            className={`picture-choice ${picked === choice.id ? "selected" : ""}`}
+            onClick={() => choose(choice.id)}
+          >
+            <div className="picture-icon">{choice.icon}</div>
+            <strong>{choice.label}</strong>
+          </button>
+        ))}
+      </div>
+
+      {success && <div className="hint-box success-tone">{game.data.success}</div>}
+
+      <button
+        className="primary-button bottom"
+        type="button"
+        disabled={!success}
+        onClick={() =>
+          onComplete({
+            order: game.order,
+            gameId: game.id,
+            title: game.title,
+            attemptCount,
+            hintUsed,
+            promptLevel: hintUsed ? "prompted" : game.promptLevel,
+            selectedAnswer: picked,
+            success: true,
+          })
+        }
+      >
+        শেষ করেছি
+      </button>
+    </div>
+  );
+}
+
+function SocialResponseGame({ game, moodId, onComplete }) {
+  const hintThreshold = moodId === "sad" ? 1 : 2;
+  const [picked, setPicked] = useState("");
+  const [attemptCount, setAttemptCount] = useState(0);
+  const [hintUsed, setHintUsed] = useState(false);
+
+  function choose(optionId) {
+    const nextAttempts = attemptCount + 1;
+    setPicked(optionId);
+    setAttemptCount(nextAttempts);
+    if (optionId !== game.data.correct && nextAttempts >= hintThreshold) {
+      setHintUsed(true);
+    }
+  }
+
+  const success = picked === game.data.correct;
+
+  return (
+    <div className="game-body">
+      <div className="scene-card">
+        <div className="scene-people">
+          {game.data.sceneVisual.map((item, index) => <span key={`${item}-${index}`}>{item}</span>)}
+        </div>
+        <strong>{game.data.sceneTitle}</strong>
+      </div>
+
+      {hintUsed && <div className="hint-box">{game.data.hint}</div>}
+
+      <div className={`picture-grid ${game.data.choices.length === 2 ? "two" : "three"}`}>
+        {game.data.choices.map((choice) => (
+          <button
+            key={choice.id}
+            type="button"
+            className={`picture-choice ${picked === choice.id ? "selected" : ""}`}
+            onClick={() => choose(choice.id)}
+          >
+            <div className="picture-icon">{choice.icon}</div>
+            <strong>{choice.label}</strong>
+          </button>
+        ))}
+      </div>
+
+      {success && <div className="hint-box success-tone">{game.data.success}</div>}
+
+      <button
+        className="primary-button bottom"
+        type="button"
+        disabled={!success}
+        onClick={() =>
+          onComplete({
+            order: game.order,
+            gameId: game.id,
+            title: game.title,
+            attemptCount,
+            hintUsed,
+            promptLevel: hintUsed ? "prompted" : game.promptLevel,
+            selectedAnswer: picked,
+            success: true,
+          })
+        }
+      >
+        শেষ করেছি
+      </button>
+    </div>
+  );
+}
+
+function FinishScreen({ childName, completed, goSummary }) {
   return (
     <Screen>
-      <button className="ghost-back" type="button" onClick={() => go("home")}>‹</button>
-      <div className="dashboard-head"><div><p className="eyebrow">Parent Dashboard</p><h2>সাপ্তাহিক অগ্রগতি</h2></div><button className="small-chip" type="button" onClick={() => go("therapist")}>Therapist</button></div>
-      <div className="stat-row"><div><strong>{progress.completed}</strong><span>Complete</span></div><div><strong>{progress.starsEarned}</strong><span>Earned star</span></div></div>
-      <div className="mood-history">{recentMoods.length ? recentMoods.map((item, index) => <span key={`${item.date}-${index}`}>{item.mood}</span>) : <><span>🙂 সোম</span><span>😐 মঙ্গল</span><span>{mood || "🙂"} আজ</span><span>☁ calm</span></>}</div>
-      <div className="chart-card"><h3>Module progress</h3>{moduleEntries.length ? <div className="module-list">{moduleEntries.map(([label, item]) => <div key={label}><span>{label}</span><strong>{item.count}x · ★ {item.stars}</strong></div>)}</div> : <div className="empty-state">এখনো activity complete হয়নি।</div>}</div>
-      <div className="insight-card"><h3>Home practice</h3><p>{weakEntries.length ? `${childName} ${weakEntries[0][0]}-এ একটু help চাইছে। familiar hint দিয়ে ৫ মিনিট practice করুন।` : `${childName} এর জন্য ${mode.label} mode-এ ৫ মিনিট “${mode.activities[0][1]}” অনুশীলন রাখুন।`}</p></div>
-      <div className="setting-card"><label htmlFor="fontSize">Font size</label><input id="fontSize" type="range" min="0.95" max="1.16" step="0.01" value={fontScale} onChange={(event) => setFontScale(Number(event.target.value))} /></div>
-      <div className="setting-card setting-row"><span>Language</span><button type="button" onClick={() => setLanguage(language === "bn" ? "en" : "bn")}>{language === "bn" ? "বাংলা" : "English"}</button></div>
-      <button className="secondary-button setup-again" type="button" onClick={restartSetup}>Setup আবার করুন</button>
-      <TabBar active="parent" go={go} />
+      <div className="reward-center">
+        <div className="giant-star">⭐</div>
+        <h2>দারুণ হয়েছে</h2>
+        <p>{childName} আজ {completed}/3 game শেষ করেছে</p>
+      </div>
+      <button className="primary-button bottom" type="button" onClick={goSummary}>
+        parent summary
+      </button>
     </Screen>
   );
 }
 
-function TherapistMode({ childName, go }) {
-  return <Screen><button className="ghost-back" type="button" onClick={() => go("parent")}>‹</button><div className="screen-head"><p className="eyebrow">Therapist Mode</p><h2>{childName} · রিপোর্ট</h2></div><div className="task-list">{["ইমোশন গেম 8/10", "সোশ্যাল স্টোরি 6/10", "Eye Contact 7/10", "AAC Board 5/10"].map((item) => <div key={item}><span>{item.slice(0, -4)}</span><strong>{item.slice(-4)}</strong></div>)}</div><label className="field-label" htmlFor="note">Session note</label><textarea id="note" className="text-input textarea" defaultValue="আজ calm screen দ্রুত কাজে এসেছে। পরের সেশনে পরিচিত emotion card আগে দিন।" /><button className="primary-button bottom" type="button" onClick={() => go("parent")}>Parent-কে পাঠান</button></Screen>;
+function SummaryScreen({ setup, summary, sessionResults, restartDay, resetAll, goHome }) {
+  return (
+    <Screen>
+      <div className="screen-head">
+        <p className="eyebrow">Parent summary</p>
+        <h2>{setup.childName || "আজকের session"}</h2>
+        <p className="subtitle">আজকের ৩টা game কেমন গেল তার ছোট summary</p>
+      </div>
+
+      <div className="summary-card">
+        <div>
+          <strong>আজকের mood</strong>
+          <span>{summary.mood.emoji} {summary.mood.label}</span>
+        </div>
+        <div>
+          <strong>Complete</strong>
+          <span>{summary.completed}/3</span>
+        </div>
+      </div>
+
+      <div className="summary-block">
+        <h3>কোন game-এ hint লেগেছে</h3>
+        <p>{summary.hintGames.length ? summary.hintGames.join(", ") : "আজ hint ছাড়াই করা গেছে।"}</p>
+      </div>
+
+      <div className="summary-block">
+        <h3>সবচেয়ে সহজ ছিল</h3>
+        <p>{summary.easiest ? `${summary.easiest.title} · ${summary.easiest.attemptCount} বারেই` : "এখনও game শেষ হয়নি।"}</p>
+      </div>
+
+      <div className="summary-block">
+        <h3>আজকের home suggestion</h3>
+        <p>{summary.suggestion}</p>
+      </div>
+
+      <div className="result-list">
+        {sessionResults.map((result) => (
+          <div key={`${result.gameId}-${result.order}`} className="result-row">
+            <strong>{result.title}</strong>
+            <span>{result.attemptCount} বার · {result.hintUsed ? "hint" : "no hint"}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="two-actions bottom-row">
+        <button className="primary-button" type="button" onClick={restartDay}>নতুন mood দিয়ে শুরু</button>
+        <button className="secondary-button" type="button" onClick={goHome}>আজকের plan</button>
+      </div>
+      <button className="ghost-reset" type="button" onClick={resetAll}>সব reset</button>
+    </Screen>
+  );
+}
+
+function Screen({ children }) {
+  return <section className="screen active">{children}</section>;
 }
 
 export default App;
