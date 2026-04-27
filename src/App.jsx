@@ -420,7 +420,7 @@ function BubbleActivity({ activity, reward, go }) {
   const bubbles = ["b1", "b2", "b3", "b4", "b5"];
   const complete = popped.length >= bubbles.length;
   return (
-    <ActivityShell title={activity.label} subtitle={activity.description} back={() => go("home")}>
+    <ActivityShell title={activity.label} subtitle={activity.description} guide="শিশুকে বলুন: ‘একটা bubble ধরো’। হাত ধরে না টেনে, শুধু screen-এর দিকে আলতো ইঙ্গিত করুন। সব bubble শেষ হলে শান্তভাবে বলুন ‘শেষ’।" back={() => go("home")}>
       <div className="bubble-play">
         {bubbles.map((id, index) => <button className={`bubble bubble-${index + 1} ${popped.includes(id) ? "popped" : ""}`} type="button" key={id} onClick={() => setPopped((items) => items.includes(id) ? items : [...items, id])}>🫧</button>)}
       </div>
@@ -434,7 +434,7 @@ function ColorActivity({ activity, reward, go }) {
   const [chosen, setChosen] = useState("");
   const colors = [["লাল", "#d98a9a"], ["নীল", "#8ea9c8"], ["হলুদ", "#ffd36f"]];
   return (
-    <ActivityShell title={activity.label} subtitle={activity.description} back={() => go("home")}>
+    <ActivityShell title={activity.label} subtitle={activity.description} guide="একবারে একটি রং বলুন। যেমন ‘লাল কোথায়?’ শিশু tap করলে রংটির নাম ধীরে repeat করুন। ভুল tap করলে কিছু বলার দরকার নেই, আবার রং দেখান।" back={() => go("home")}>
       <div className="color-touch">{colors.map(([label, color]) => <button className={chosen === label ? "selected" : ""} style={{ background: color }} type="button" key={label} onClick={() => setChosen(label)}><span>{label}</span></button>)}</div>
       <div className="speech-output">{chosen ? `${chosen} রং` : "একটি রং ছুঁয়ে দেখো"}</div>
       <button className="primary-button bottom" type="button" disabled={!chosen} onClick={() => reward(3)}>শেষ করেছি</button>
@@ -454,7 +454,7 @@ function MemoryActivity({ activity, reward, go }) {
     if (next.length === 2 && cards[next[0]] !== cards[next[1]]) window.setTimeout(() => setOpen([]), 450);
   }
   return (
-    <ActivityShell title={activity.label} subtitle={activity.description} back={() => go("home")}>
+    <ActivityShell title={activity.label} subtitle={activity.description} guide="শিশুকে বলুন দুইটি card খুলে দেখতে। মিল হলে ‘একই’ বলুন, না মিললে কোনো negative শব্দ নয়। চাইলে parent আগে এক pair দেখিয়ে model করতে পারেন।" back={() => go("home")}>
       <div className="memory-grid">{cards.map((card, index) => <button type="button" key={`${card}-${index}`} onClick={() => pick(index)}>{open.includes(index) || matched.includes(index) ? card : "✦"}</button>)}</div>
       <div className="activity-meter">{matched.length / 2}/2 pair</div>
       <button className="primary-button bottom" type="button" disabled={matched.length < cards.length} onClick={() => reward(5)}>শেষ করেছি</button>
@@ -466,7 +466,7 @@ function RoutineActivity({ activity, reward, go }) {
   const steps = ["ব্রাশ", "গোসল", "নাস্তা"];
   const [done, setDone] = useState([]);
   return (
-    <ActivityShell title={activity.label} subtitle={activity.description} back={() => go("home")}>
+    <ActivityShell title={activity.label} subtitle={activity.description} guide="বাসার real routine-এর সাথে মিলিয়ে বলুন: ‘আগে ব্রাশ, তারপর গোসল, তারপর নাস্তা’। প্রতিটি step শেষে child-এর real-life কাজের ছবি দেখালে আরও ভালো।" back={() => go("home")}>
       <div className="routine-track">{steps.map((step, index) => <button className={done.includes(step) ? "done" : ""} type="button" key={step} onClick={() => done.length === index && setDone([...done, step])}><span>{index + 1}</span>{step}</button>)}</div>
       <div className="activity-meter">{done.length}/3 step</div>
       <button className="primary-button bottom" type="button" disabled={done.length < 3} onClick={() => reward(5)}>রুটিন শেষ</button>
@@ -477,7 +477,7 @@ function RoutineActivity({ activity, reward, go }) {
 function ChoiceActivity({ activity, question, options, correct, reward, go }) {
   const [picked, setPicked] = useState("");
   return (
-    <ActivityShell title={activity.label} subtitle={activity.description} back={() => go("home")}>
+    <ActivityShell title={activity.label} subtitle={activity.description} guide="প্রশ্নটি ধীরে পড়ুন, তারপর প্রতিটি option দেখিয়ে নাম বলুন। শিশুকে সময় দিন। ভুল হলে ‘না’ বলবেন না, শুধু প্রশ্নটি আবার সহজ করে বলুন।" back={() => go("home")}>
       <div className="choice-question"><span>{activity.icon}</span><h3>{question}</h3></div>
       <div className="story-options">{options.map((option) => <button type="button" key={option} onClick={() => setPicked(option)}>{option}</button>)}</div>
       {picked && <div className="helper-hint">{picked === correct ? "ঠিক হয়েছে। খুব ভালো!" : "আবার ধীরে ভাবি।"}</div>}
@@ -488,7 +488,7 @@ function ChoiceActivity({ activity, question, options, correct, reward, go }) {
 
 function Emotion({ reward, softMiss, hintVisible, attempts, go }) {
   return (
-    <ActivityShell title="ইমোশন গেম" subtitle="কোন মুখটি খুশি?" back={() => go("home")}>
+    <ActivityShell title="ইমোশন গেম" subtitle="কোন মুখটি খুশি?" guide="মুখের পুরো detail explain করবেন না। শুধু চোখ আর হাসির দিকে ইঙ্গিত করুন। বলুন: ‘হাসি আছে, তাই খুশি’। real human face ব্যবহার না করাই ভালো।" back={() => go("home")}>
       <div className="portrait-card"><div className="simple-face">😊</div></div>
       {hintVisible && <div className="helper-hint">চোখ আর হাসিটা দেখো। যে মুখে নরম হাসি আছে সেটাই খুশি।</div>}
       <div className="emotion-options">
@@ -504,7 +504,7 @@ function Emotion({ reward, softMiss, hintVisible, attempts, go }) {
 
 function Story({ reward, softMiss, hintVisible, go }) {
   return (
-    <ActivityShell title="সোশ্যাল স্টোরি" subtitle="কাউকে দেখলে হ্যালো বলতে হয়" back={() => go("home")}>
+    <ActivityShell title="সোশ্যাল স্টোরি" subtitle="কাউকে দেখলে হ্যালো বলতে হয়" guide="প্রথমে scene দেখান, তারপর নিজে model করুন: হাত নেড়ে ‘হ্যালো’। শিশুকে repeat করতে চাপ দেবেন না; শুধু option বেছে নিতে বলুন।" back={() => go("home")}>
       <div className="story-scene"><span>👦</span><span>👋</span><span>👧</span></div>
       <p className="story-copy">রুহান আরিফকে দেখে, হাসিমুখে হ্যালো বললে সবাই খুশি হয়।</p>
       {hintVisible && <div className="helper-hint">নরমভাবে হাত নেড়ে “হ্যালো” বলা যায়।</div>}
@@ -518,13 +518,13 @@ function Story({ reward, softMiss, hintVisible, go }) {
 }
 
 function Trace({ reward, go }) {
-  return <ActivityShell title="জাদুকরী আঙুল" subtitle="অক্ষর ছুঁয়ে ধীরে ধীরে আঁকো" back={() => go("home")}><div className="trace-board"><span>অ</span><div className="trace-glow" /></div><button className="primary-button bottom" type="button" onClick={() => reward(4)}>শেষ করেছি</button></ActivityShell>;
+  return <ActivityShell title="জাদুকরী আঙুল" subtitle="অক্ষর ছুঁয়ে ধীরে ধীরে আঁকো" guide="শিশুর আঙুল ধরে টানবেন না। আগে parent নিজে বাতাসে ‘অ’ আঁকুন, তারপর child-কে screen-এ চেষ্টা করতে দিন। perfect tracing দরকার নেই।" back={() => go("home")}><div className="trace-board"><span>অ</span><div className="trace-glow" /></div><button className="primary-button bottom" type="button" onClick={() => reward(4)}>শেষ করেছি</button></ActivityShell>;
 }
 
 function Aac({ recordActivity, go }) {
   const [phrase, setPhrase] = useState("ছবিতে tap করলে বাক্য এখানে দেখা যাবে।");
   return (
-    <ActivityShell title="AAC বোর্ড" subtitle="ছবিতে tap করে প্রয়োজন বলা যাবে।" back={() => go("mode")}>
+    <ActivityShell title="AAC বোর্ড" subtitle="ছবিতে tap করে প্রয়োজন বলা যাবে।" guide="শিশু card tap করলে বাক্যটি parent উচ্চারণ করুন। যেমন ‘আমি পানি চাই’। এরপর সম্ভব হলে real পানি দিন, যাতে symbol আর বাস্তব প্রয়োজনের connection তৈরি হয়।" back={() => go("mode")}>
       <div className="speech-output">{phrase}</div>
       <div className="aac-grid">{aacItems.map(([icon, label]) => <button type="button" key={label} onClick={() => { setPhrase(label); recordActivity("AAC বোর্ড", 0, false); }}>{icon}<span>{label}</span></button>)}</div>
     </ActivityShell>
@@ -543,8 +543,29 @@ function Customize({ go }) {
   return <Screen><button className="ghost-back" type="button" onClick={() => go("reward")}>‹</button><div className="screen-head centered"><h2>তোমার চরিত্র সাজাও</h2></div><div className="avatar-preview">👦</div><div className="custom-tabs"><button className="active">চুল</button><button>পোশাক</button><button>ব্যাকগ্রাউন্ড</button></div><div className="closet-row"><button>👕</button><button>👚</button><button>🧥</button><button>🎒</button></div><button className="primary-button bottom" type="button" onClick={() => go("home")}>সংরক্ষণ</button></Screen>;
 }
 
-function ActivityShell({ title, subtitle, back, children }) {
-  return <Screen><button className="ghost-back" type="button" onClick={back}>‹</button><div className="screen-head centered"><h2>{title}</h2><p>{subtitle}</p></div>{children}</Screen>;
+function ActivityShell({ title, subtitle, guide, back, children }) {
+  const [guideOpen, setGuideOpen] = useState(false);
+  return (
+    <Screen>
+      <button className="ghost-back" type="button" onClick={back}>‹</button>
+      <div className="screen-head centered">
+        <h2>{title}</h2>
+        <p>{subtitle}</p>
+        {guide && <button className="parent-guide-trigger" type="button" onClick={() => setGuideOpen(true)}>Parent guide</button>}
+      </div>
+      {children}
+      {guideOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Parent guide">
+          <div className="parent-guide-modal">
+            <div className="modal-cloud">☁</div>
+            <h3>Parent guide</h3>
+            <p>{guide}</p>
+            <button className="primary-button" type="button" onClick={() => setGuideOpen(false)}>বুঝেছি</button>
+          </div>
+        </div>
+      )}
+    </Screen>
+  );
 }
 
 function TabBar({ active, go }) {
